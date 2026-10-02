@@ -1,6 +1,7 @@
 """Service health endpoints used by monitoring, load balancers and deployment platforms."""
 
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlmodel import Session
