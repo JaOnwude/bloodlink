@@ -1,5 +1,6 @@
 """Service health endpoints used by monitoring, load balancers and deployment platforms."""
 
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlmodel import Session
@@ -39,7 +40,7 @@ def liveness() -> HealthResponse:
     summary="Readiness probe",
     responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Database unreachable"}},
 )
-def readiness(session: Session = Depends(get_session)) -> ReadinessResponse:
+def readiness(session: Annotated[Session, Depends(get_session)]) -> ReadinessResponse:
     """Report whether the API can currently serve traffic that needs the database.
 
     Raises:
