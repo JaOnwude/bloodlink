@@ -1,0 +1,45 @@
+[project]
+name = "bloodlink-api"
+version = "0.1.0"
+description = "REST API for BloodLink: urgent blood requests and donor matching."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlmodel>=0.0.22",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.4",
+    "email-validator>=2.2",
+    "pyjwt>=2.9",
+    "argon2-cffi>=23.1",
+    # Used by the test client and by outbound provider calls (SMS gateway).
+    "httpx>=0.27",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.uv]
+# This is an application, not a library: do not build or install it as a package.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
