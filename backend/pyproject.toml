@@ -40,6 +40,9 @@ extend-exclude = ["alembic/versions"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+known-third-party = ["alembic"]
+
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
