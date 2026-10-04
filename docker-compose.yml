@@ -1,0 +1,43 @@
+# Local development stack.
+#
+#   docker compose up -d db            -> PostgreSQL only (day-to-day development)
+#   docker compose --profile full up   -> PostgreSQL + containerised API
+#
+# Credentials and the published port come from the ".env" file in this folder.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bloodlink-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bloodlink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-bloodlink}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - bloodlink_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build: ./backend
+    container_name: bloodlink-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Inside the compose network the database is reachable as "db:5432".
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-bloodlink}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-bloodlink}
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000"]}
+    ports:
+      - "8000:8000"
+
+volumes:
+  bloodlink_pgdata:
