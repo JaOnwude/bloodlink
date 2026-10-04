@@ -12,6 +12,7 @@ Keeping these concerns in one small, dependency-free module makes them easy to t
 isolation and easy to review, which matters because mistakes here are security defects.
 """
 
+import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from functools import cache
@@ -44,6 +45,18 @@ _hasher = PasswordHasher()
 # ---------------------------------------------------------------------------------------
 
 
+def _normalise_password(password: str) -> str:
+    """Return the password in Unicode compatibility-composed form (NFKC).
+
+    The same visible password can be encoded in more than one way (for example a ligature
+    versus its separate letters, or a precomposed accent versus a base letter plus a
+    combining mark), and different keyboards and phones produce different encodings.
+    Normalising before hashing and verifying means a password typed on one device still
+    works when typed on another.
+    """
+    return unicodedata.normalize("NFKC", password)
+
+
 def hash_password(password: str) -> str:
     """Return a salted Argon2id hash of ``password``, suitable for storing in the database.
 
@@ -58,7 +71,7 @@ def hash_password(password: str) -> str:
     Returns:
         An encoded hash beginning with ``$argon2id$``.
     """
-    return _hasher.hash(password)
+    return _hasher.hash(_normalise_password(password))
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -76,7 +89,7 @@ def verify_password(password: str, password_hash: str) -> bool:
         True only when the password matches the hash.
     """
     try:
-        return _hasher.verify(password_hash, password)
+        return _hasher.verify(password_hash, _normalise_password(password))
     except (VerificationError, InvalidHashError):
         return False
 

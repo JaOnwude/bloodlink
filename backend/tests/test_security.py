@@ -67,6 +67,12 @@ def test_unicode_passwords_round_trip() -> None:
     assert verify_password(password, hash_password(password)) is True
 
 
+def test_equivalent_unicode_spellings_of_a_password_match() -> None:
+    """A ligature typed on one device matches the separate letters typed on another."""
+    hashed = hash_password("passfi-long-enough-passphrase")
+    assert verify_password("pass\ufb01-long-enough-passphrase", hashed) is True
+
+
 @pytest.mark.parametrize("bad_hash", ["", "not-a-hash", "$argon2id$garbage"])
 def test_malformed_hashes_return_false_instead_of_raising(bad_hash: str) -> None:
     assert verify_password("anything", bad_hash) is False
