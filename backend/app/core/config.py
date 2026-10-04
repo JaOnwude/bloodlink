@@ -31,7 +31,16 @@ class Settings(BaseSettings):
         api_prefix: URL prefix under which every API route is mounted.
         database_url: SQLAlchemy connection URL for PostgreSQL (psycopg 3 driver).
         secret_key: Key used to sign authentication tokens.
-        access_token_expire_minutes: Lifetime of an issued access token.
+        access_token_expire_minutes: Lifetime of an issued access token and its cookie.
+        auth_cookie_name: Name of the httpOnly cookie that carries the session token.
+        auth_cookie_secure: Send the cookie over HTTPS only. Always on in production.
+        auth_cookie_samesite: Cross-site policy of the cookie. ``lax`` stops browsers
+            attaching it to cross-site form posts, which blocks cross-site request forgery.
+        min_password_length: Shortest accepted password, counted in Unicode characters.
+        max_password_length: Longest accepted password. Kept generous so passphrases and
+            password-manager output are never rejected.
+        login_max_failed_attempts: Failed sign-ins allowed per window before throttling.
+        login_window_seconds: Length of the throttling window.
         cors_origins: Browser origins permitted to call the API with credentials.
         default_search_radius_km: Default radius used when searching for donors.
         min_donor_age_years: Lowest permitted donor age, in whole years.
@@ -39,6 +48,10 @@ class Settings(BaseSettings):
         min_donor_weight_kg: Lowest permitted donor body weight.
 
     Note:
+        The password limits follow NIST SP 800-63B-4: at least 15 characters when the
+        password is the only authentication factor, support for at least 64 characters,
+        and no character-composition rules.
+
         The donor age and weight limits are working defaults. They must be confirmed
         against the national transfusion service and WHO guidance cited in the project
         research notes before the system is used outside a demonstration.
@@ -59,12 +72,31 @@ class Settings(BaseSettings):
     secret_key: str = _INSECURE_DEFAULT_SECRET
     access_token_expire_minutes: int = 60 * 12
 
+    auth_cookie_name: str = "bloodlink_session"
+    auth_cookie_secure: bool = False
+    auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+
+    min_password_length: int = 15
+    max_password_length: int = 128
+
+    login_max_failed_attempts: int = 5
+    login_window_seconds: int = 15 * 60
+
     cors_origins: list[str] = ["http://localhost:3000"]
 
     default_search_radius_km: float = 25.0
     min_donor_age_years: int = 18
     max_donor_age_years: int = 65
     min_donor_weight_kg: float = 50.0
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        """Whether the session cookie must be restricted to HTTPS.
+
+        Production deployments always require it, regardless of the explicit setting, so a
+        forgotten environment variable cannot weaken the cookie.
+        """
+        return self.auth_cookie_secure or self.environment == "production"
 
     @field_validator("database_url")
     @classmethod
@@ -91,6 +123,13 @@ class Settings(BaseSettings):
                 "SECRET_KEY must be set to a random value of at least "
                 f"{_MIN_PRODUCTION_SECRET_LENGTH} characters in production."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_secure_cookie_for_cross_site_policy(self) -> Self:
+        """Browsers reject ``SameSite=None`` cookies that are not marked ``Secure``."""
+        if self.auth_cookie_samesite == "none" and not self.session_cookie_secure:
+            raise ValueError("AUTH_COOKIE_SAMESITE=none requires AUTH_COOKIE_SECURE=true.")
         return self
 
 

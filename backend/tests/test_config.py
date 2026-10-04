@@ -35,3 +35,32 @@ def test_production_accepts_a_long_random_secret() -> None:
     """A sufficiently long key is accepted in production."""
     settings = Settings(_env_file=None, environment="production", secret_key="x" * 48)
     assert settings.environment == "production"
+
+
+def test_session_cookie_is_always_secure_in_production() -> None:
+    """Production forces the Secure flag even when it was not requested explicitly."""
+    settings = Settings(
+        _env_file=None, environment="production", secret_key="x" * 48, auth_cookie_secure=False
+    )
+    assert settings.session_cookie_secure is True
+
+
+def test_session_cookie_follows_the_setting_in_development() -> None:
+    """Local development over plain HTTP works without the Secure flag."""
+    assert Settings(_env_file=None).session_cookie_secure is False
+    assert Settings(_env_file=None, auth_cookie_secure=True).session_cookie_secure is True
+
+
+def test_samesite_none_requires_a_secure_cookie() -> None:
+    """Browsers discard SameSite=None cookies that are not Secure, so refuse the setting."""
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, auth_cookie_samesite="none")
+    ok = Settings(_env_file=None, auth_cookie_samesite="none", auth_cookie_secure=True)
+    assert ok.auth_cookie_samesite == "none"
+
+
+def test_password_limits_follow_current_guidance() -> None:
+    """Defaults: 15 characters minimum, and room for passphrases of 64 or more."""
+    settings = Settings(_env_file=None)
+    assert settings.min_password_length == 15
+    assert settings.max_password_length >= 64
