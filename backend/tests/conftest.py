@@ -25,6 +25,7 @@ from sqlmodel import Session, SQLModel, create_engine
 import app.models  # noqa: F401  (registers every table on SQLModel.metadata)
 from app.core.config import get_settings
 from app.core.rate_limit import get_login_limiter
+from app.db.seed import seed_reference_data
 from app.db.session import get_session
 from app.main import app
 
@@ -104,3 +105,9 @@ def client(db_engine: Engine, clean_database: None) -> Generator[TestClient, Non
     finally:
         app.dependency_overrides.clear()
         get_login_limiter().clear()
+
+
+@pytest.fixture
+def reference_data(db_session: Session) -> None:
+    """Load the blood compatibility chart and component types into the test database."""
+    seed_reference_data(db_session)
