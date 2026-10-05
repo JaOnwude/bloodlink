@@ -9,8 +9,8 @@ from sqlmodel import Session
 from app.core.config import get_settings
 from app.core.security import TokenError, decode_access_token
 from app.db.session import get_session
-from app.models import User
-from app.models.enums import UserRole
+from app.models import Hospital, User
+from app.models.enums import UserRole, VerificationStatus
 
 # Reusable annotated type so handlers can simply declare ``session: SessionDep``.
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -80,3 +80,49 @@ def require_roles(*allowed: UserRole) -> Callable[[User], User]:
         return user
 
     return dependency
+
+
+# Reusable annotated types for routes restricted to one role. Declaring ``user: DonorUser``
+# both signs the caller in (401 otherwise) and checks the role (403 otherwise).
+DonorUser = Annotated[User, Depends(require_roles(UserRole.DONOR))]
+StaffUser = Annotated[User, Depends(require_roles(UserRole.HOSPITAL_STAFF))]
+AdminUser = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
+
+
+def get_client_ip(request: Request) -> str | None:
+    """Return the network address of the caller, for the audit log.
+
+    Behind a proxy or load balancer this is the proxy's address unless the platform is
+    configured to forward the original one.
+    """
+    return request.client.host if request.client else None
+
+
+ClientIp = Annotated[str | None, Depends(get_client_ip)]
+
+
+def get_verified_hospital(staff: StaffUser, session: SessionDep) -> Hospital:
+    """Return the staff member's hospital, provided an administrator has verified it.
+
+    Features that act on behalf of a hospital, such as raising a blood request, depend on
+    this. It keeps every alert that reaches a donor tied to a facility that has been vetted.
+
+    Raises:
+        HTTPException: 403 if the staff member has not registered a hospital, or if it is
+            still pending or has been rejected.
+    """
+    if staff.hospital_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Register your hospital before using this feature.",
+        )
+    hospital = session.get(Hospital, staff.hospital_id)
+    if hospital is None or hospital.verification_status != VerificationStatus.VERIFIED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your hospital has not been verified yet.",
+        )
+    return hospital
+
+
+VerifiedHospital = Annotated[Hospital, Depends(get_verified_hospital)]
