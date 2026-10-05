@@ -1,6 +1,5 @@
 """Request and response models for the authentication endpoints."""
 
-import re
 from typing import Annotated, Self
 from uuid import UUID
 
@@ -19,12 +18,7 @@ from pydantic import (
 from app.core.config import get_settings
 from app.core.password_policy import PasswordPolicyError, validate_password
 from app.models.enums import UserRole
-
-# International-style number: optional leading plus, then 7 to 15 digits (the E.164 maximum).
-_PHONE_PATTERN = re.compile(r"^\+?\d{7,15}$")
-
-# Characters people commonly type inside phone numbers that carry no meaning.
-_PHONE_SEPARATORS = re.compile(r"[\s\-().]")
+from app.schemas.common import OptionalPhone
 
 # Roles that a visitor may choose for themselves. Administrators are never self-registered;
 # they are created from the command line by someone with access to the server.
@@ -63,7 +57,7 @@ class RegisterRequest(BaseModel):
     full_name: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)
     ]
-    phone: str | None = None
+    phone: OptionalPhone = None
     role: UserRole
 
     @field_validator("role")
@@ -72,18 +66,6 @@ class RegisterRequest(BaseModel):
         if value not in _SELF_SERVICE_ROLES:
             raise ValueError("Accounts of this type cannot be created through registration.")
         return value
-
-    @field_validator("phone", mode="before")
-    @classmethod
-    def _clean_phone(cls, value: object) -> object:
-        if value is None or (isinstance(value, str) and not value.strip()):
-            return None
-        if not isinstance(value, str):
-            raise ValueError("Phone number must be text.")
-        cleaned = _PHONE_SEPARATORS.sub("", value)
-        if not _PHONE_PATTERN.fullmatch(cleaned):
-            raise ValueError("Enter a valid phone number, for example +2348031234567.")
-        return cleaned
 
     @model_validator(mode="after")
     def _enforce_password_policy(self) -> Self:
