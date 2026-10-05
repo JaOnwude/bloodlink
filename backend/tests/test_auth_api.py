@@ -16,7 +16,7 @@ from app.models.enums import UserRole
 from app.services.auth import create_user
 
 PASSWORD = "correct-horse-battery-staple-42"
-BASE = "/api/v1/auth"
+BASE = f"{get_settings().api_prefix}/auth"
 
 
 def payload(**overrides: object) -> dict[str, object]:
