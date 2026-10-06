@@ -3,15 +3,14 @@
  *
  * Checks the form locally for empty fields, sends the credentials to the API (which sets the
  * session cookie), then asks the API who is signed in. Once the session is confirmed, an
- * effect sends the visitor on to the page they were trying to reach, or to the home page.
- * Visitors who are already signed in are sent on immediately.
+ * hook sends the visitor on to the page they were trying to reach, or to the landing page
+ * for their role. Visitors who are already signed in are sent on immediately.
  */
 
 import { CircleAlert } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -23,26 +22,18 @@ import { api } from "@/lib/api";
 import { failureFromError, focusFirstInvalid } from "@/lib/forms";
 import type { FieldErrors } from "@/lib/forms";
 import { images } from "@/lib/images";
-import { safeRedirectPath } from "@/lib/redirect";
+import { useRedirectIfSignedIn } from "@/lib/use-redirect-if-signed-in";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { status, refresh } = useAuth();
-  const nextPath = safeRedirectPath(router.query.next);
+  const { refresh } = useAuth();
+  // Signed-in visitors are redirected by this hook once the session is confirmed.
+  const requestedPath = useRedirectIfSignedIn();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Send signed-in visitors on their way. Waits for the query string to be available so the
-  // requested destination is not lost.
-  useEffect(() => {
-    if (router.isReady && status === "authenticated") {
-      void router.replace(nextPath);
-    }
-  }, [router, status, nextPath]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -70,7 +61,7 @@ export default function LoginPage() {
         );
         setSubmitting(false);
       }
-      // On success the effect above navigates once the session is confirmed.
+      // On success the redirect hook navigates once the session is confirmed.
     } catch (error) {
       const failure = failureFromError(error);
       setErrors(failure.fields);
@@ -79,8 +70,9 @@ export default function LoginPage() {
     }
   }
 
-  const registerHref =
-    nextPath === "/" ? "/register" : `/register?next=${encodeURIComponent(nextPath)}`;
+  const registerHref = requestedPath
+    ? `/register?next=${encodeURIComponent(requestedPath)}`
+    : "/register";
 
   return (
     <>

@@ -11,8 +11,7 @@
 import { CircleAlert } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -30,14 +29,14 @@ import {
 } from "@/lib/forms";
 import type { FieldErrors } from "@/lib/forms";
 import { images } from "@/lib/images";
-import { safeRedirectPath } from "@/lib/redirect";
+import { useRedirectIfSignedIn } from "@/lib/use-redirect-if-signed-in";
 
 const FIELD_ORDER = ["full_name", "email", "phone", "password"];
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { status, refresh } = useAuth();
-  const nextPath = safeRedirectPath(router.query.next);
+  const { refresh } = useAuth();
+  // Signed-in visitors are redirected by this hook once the session is confirmed.
+  const requestedPath = useRedirectIfSignedIn();
 
   const [role, setRole] = useState<SelfServiceRole>("donor");
   const [fullName, setFullName] = useState("");
@@ -47,13 +46,6 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Send signed-in visitors on their way once the query string is available.
-  useEffect(() => {
-    if (router.isReady && status === "authenticated") {
-      void router.replace(nextPath);
-    }
-  }, [router, status, nextPath]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,7 +83,7 @@ export default function RegisterPage() {
         );
         setSubmitting(false);
       }
-      // On success the effect above navigates once the session is confirmed.
+      // On success the redirect hook navigates once the session is confirmed.
     } catch (error) {
       const failure = failureFromError(error);
       setErrors(failure.fields);
@@ -101,8 +93,9 @@ export default function RegisterPage() {
     }
   }
 
-  const signInHref =
-    nextPath === "/" ? "/login" : `/login?next=${encodeURIComponent(nextPath)}`;
+  const signInHref = requestedPath
+    ? `/login?next=${encodeURIComponent(requestedPath)}`
+    : "/login";
 
   return (
     <>
