@@ -9,7 +9,7 @@
  * anything it rejects is shown beside the field it concerns.
  */
 
-import { CircleAlert, MapPin } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useState } from "react";
@@ -18,20 +18,17 @@ import type { FormEvent } from "react";
 import { FormField } from "@/components/auth/FormField";
 import { CheckboxField } from "@/components/form/CheckboxField";
 import { ChoiceCards } from "@/components/form/ChoiceCards";
+import { LocationPicker } from "@/components/form/LocationPicker";
 import { SelectField } from "@/components/form/SelectField";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { failureFromError, focusFirstInvalid } from "@/lib/forms";
 import type { FieldErrors } from "@/lib/forms";
 import { todayIso } from "@/lib/format";
-import { NIGERIAN_CITIES, findCity, roundCoordinate } from "@/lib/locations";
+import { findCity } from "@/lib/locations";
+import type { Coordinates } from "@/lib/locations";
 import { BLOOD_GROUPS } from "@/types/api";
 import type { BloodGroup, DonorProfile, Sex } from "@/types/api";
-
-interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
 
 interface FormState {
   bloodGroup: BloodGroup | "";
@@ -135,8 +132,6 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
   const [errors, setErrors] = useState<FieldErrors>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [locationMessage, setLocationMessage] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -146,31 +141,6 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
   // an old profile never loses its city.
   const unlistedCity = initial && !findCity(initial.city) ? initial.city : null;
   const selectedCity = findCity(form.city);
-
-  function handleUseMyLocation() {
-    if (!("geolocation" in navigator)) {
-      setLocationMessage("Your browser cannot share its location. Pick your city instead.");
-      return;
-    }
-    setLocating(true);
-    setLocationMessage(null);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        update("precise", {
-          latitude: roundCoordinate(position.coords.latitude),
-          longitude: roundCoordinate(position.coords.longitude),
-        });
-        setLocating(false);
-      },
-      () => {
-        setLocationMessage(
-          "We could not get your location. Allow location access, or pick your city instead.",
-        );
-        setLocating(false);
-      },
-      { timeout: 10000, maximumAge: 600000 },
-    );
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -226,12 +196,6 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
       focusFirstInvalid(fields, FIELD_ORDER);
     }
   }
-
-  const locationSummary = form.precise
-    ? "Using your device location, rounded to about 1 km."
-    : selectedCity
-      ? `Using the centre of ${selectedCity.city}.`
-      : "Choose your city above.";
 
   return (
     <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-10">
@@ -305,48 +269,14 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
       <section className="space-y-5">
         <h2 className="text-heading font-semibold text-ink">Where you are</h2>
 
-        <SelectField
-          id="city"
-          name="city"
-          label="City"
-          hint="If your town is not listed, choose the nearest city."
-          value={form.city}
-          onChange={(event) => {
-            update("city", event.target.value);
-            update("precise", null);
-          }}
+        <LocationPicker
+          city={form.city}
+          unlistedCity={unlistedCity}
+          precise={form.precise}
+          onCityChange={(value) => update("city", value)}
+          onPreciseChange={(value) => update("precise", value)}
           error={errors.city}
-        >
-          <option value="">Select your city</option>
-          {unlistedCity ? <option value={unlistedCity}>{unlistedCity}</option> : null}
-          {NIGERIAN_CITIES.map((entry) => (
-            <option key={entry.city} value={entry.city}>
-              {entry.city}, {entry.state}
-            </option>
-          ))}
-        </SelectField>
-
-        <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-          <p className="text-sm text-ink-muted" aria-live="polite">
-            {locationSummary}
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" size="sm" onClick={handleUseMyLocation} disabled={locating}>
-              <MapPin />
-              {locating ? "Finding you..." : "Use my current location"}
-            </Button>
-            {form.precise ? (
-              <Button type="button" variant="ghost" size="sm" onClick={() => update("precise", null)}>
-                Use city centre instead
-              </Button>
-            ) : null}
-          </div>
-          {locationMessage ? (
-            <p role="alert" className="text-sm text-danger">
-              {locationMessage}
-            </p>
-          ) : null}
-        </div>
+        />
       </section>
 
       <section className="space-y-5">
