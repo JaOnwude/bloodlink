@@ -15,6 +15,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Container } from "@/components/layout/Container";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { homePathFor } from "@/lib/routes";
 import { siteConfig } from "@/lib/site";
 
 export function SiteHeader() {
@@ -39,8 +40,15 @@ export function SiteHeader() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [menuOpen]);
 
+  const dashboardHref = user ? homePathFor(user.role) : "/";
+
   const accountActions = status === "authenticated" && user ? (
     <>
+      {dashboardHref !== "/" ? (
+        <Link href={dashboardHref} className={buttonVariants({ variant: "ghost" })}>
+          Dashboard
+        </Link>
+      ) : null}
       <span className="text-sm text-ink-muted">{user.full_name}</span>
       <Button variant="outline" size="sm" onClick={() => void signOut()}>
         Sign out
