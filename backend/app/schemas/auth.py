@@ -1,6 +1,6 @@
 """Request and response models for the authentication endpoints."""
 
-from typing import Annotated, Self
+from typing import Annotated
 from uuid import UUID
 
 from pydantic import (
@@ -11,8 +11,8 @@ from pydantic import (
     EmailStr,
     Field,
     StringConstraints,
+    ValidationInfo,
     field_validator,
-    model_validator,
 )
 
 from app.core.config import get_settings
@@ -67,20 +67,30 @@ class RegisterRequest(BaseModel):
             raise ValueError("Accounts of this type cannot be created through registration.")
         return value
 
-    @model_validator(mode="after")
-    def _enforce_password_policy(self) -> Self:
-        """Apply the password policy, using the email name as context to reject."""
+    @field_validator("password")
+    @classmethod
+    def _enforce_password_policy(cls, value: str, info: ValidationInfo) -> str:
+        """Apply the password policy, using the email name as context to reject.
+
+        This is a field validator (not a whole-model one) so that a problem is reported
+        against the ``password`` field and the form can show the message beside it. The email
+        is declared first, so by now its cleaned value is available in ``info.data``.
+        """
         settings = get_settings()
+        context_terms = ["bloodlink"]
+        email = info.data.get("email")
+        if isinstance(email, str):
+            context_terms.append(email.split("@")[0])
         try:
             validate_password(
-                self.password,
+                value,
                 min_length=settings.min_password_length,
                 max_length=settings.max_password_length,
-                context_terms=[self.email.split("@")[0], "bloodlink"],
+                context_terms=context_terms,
             )
         except PasswordPolicyError as exc:
             raise ValueError(str(exc)) from exc
-        return self
+        return value
 
 
 class LoginRequest(BaseModel):

@@ -105,6 +105,13 @@ def test_short_passwords_are_rejected_and_never_echoed_back(client: TestClient) 
     assert "Zx9-short" not in response.text
 
 
+def test_password_problems_are_reported_against_the_password_field(client: TestClient) -> None:
+    response = register(client, password="Zx9-short")
+
+    locations = [error["loc"] for error in response.json()["detail"]]
+    assert ["body", "password"] in locations
+
+
 def test_common_passwords_are_rejected(client: TestClient) -> None:
     assert register(client, password="PasswordPassword").status_code == 422
 
