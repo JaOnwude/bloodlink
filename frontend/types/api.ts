@@ -80,3 +80,23 @@ export interface Eligibility {
   blockers: string[];
   components: ComponentEligibility[];
 }
+
+/** Where a hospital is in the administrator's review. */
+export type VerificationStatus = "pending" | "verified" | "rejected";
+
+/** A hospital as shown to its own staff. Timestamps are ISO date-times. */
+export interface Hospital {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  latitude: number;
+  longitude: number;
+  registration_number: string | null;
+  contact_phone: string;
+  verification_status: VerificationStatus;
+  verified_at: string | null;
+  rejection_reason: string | null;
+  created_at: string;
+}

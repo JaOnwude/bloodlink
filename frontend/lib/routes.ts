@@ -8,7 +8,7 @@ import type { UserRole } from "@/types/api";
 
 const landingPaths: Record<UserRole, string> = {
   donor: "/donor",
-  hospital_staff: "/",
+  hospital_staff: "/hospital",
   admin: "/",
 };
 
