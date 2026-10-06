@@ -47,3 +47,36 @@ export interface ReadinessResponse {
   status: "ready";
   database: "up";
 }
+
+/** Biological sex, used to choose the waiting period between donations. */
+export type Sex = "male" | "female";
+
+/** The donor's own profile as returned by the API. Dates are ISO strings (YYYY-MM-DD). */
+export interface DonorProfile {
+  id: string;
+  blood_group: BloodGroup;
+  date_of_birth: string;
+  weight_kg: number;
+  sex: Sex;
+  latitude: number;
+  longitude: number;
+  city: string;
+  last_donation_date: string | null;
+  is_available: boolean;
+  consent_to_contact: boolean;
+}
+
+/** Whether the donor can give one kind of donation, and from when if not. */
+export interface ComponentEligibility {
+  component_code: string;
+  component_name: string;
+  eligible: boolean;
+  next_eligible_date: string | null;
+}
+
+/** The donor's eligibility today, as returned by the API. */
+export interface Eligibility {
+  eligible_for_any: boolean;
+  blockers: string[];
+  components: ComponentEligibility[];
+}
