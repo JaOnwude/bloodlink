@@ -24,3 +24,12 @@ export function todayIso(): string {
   const day = String(now.getDate()).padStart(2, "0");
   return `${now.getFullYear()}-${month}-${day}`;
 }
+
+/** Formats an ISO date-time (for example from the API) as a local date, such as "12 January 2027". */
+export function formatTimestamp(iso: string): string {
+  return new Intl.DateTimeFormat("en-NG", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(iso));
+}

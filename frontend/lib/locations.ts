@@ -9,6 +9,12 @@
  * commercial cities. Someone whose town is not listed should pick the nearest city.
  */
 
+/** A position on the map. */
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
 export interface City {
   city: string;
   state: string;
