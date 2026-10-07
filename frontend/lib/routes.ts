@@ -9,7 +9,7 @@ import type { UserRole } from "@/types/api";
 const landingPaths: Record<UserRole, string> = {
   donor: "/donor",
   hospital_staff: "/hospital",
-  admin: "/",
+  admin: "/admin",
 };
 
 /** The page a signed-in user of this role starts from. */

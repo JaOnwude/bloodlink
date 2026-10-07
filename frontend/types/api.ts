@@ -100,3 +100,24 @@ export interface Hospital {
   rejection_reason: string | null;
   created_at: string;
 }
+
+/** A staff member linked to a hospital, shown to administrators reviewing it. */
+export interface StaffSummary {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+}
+
+/** A hospital as shown to administrators: its details plus the people who registered it. */
+export interface AdminHospital extends Hospital {
+  staff: StaffSummary[];
+}
+
+/** One page of the administrator's review queue. */
+export interface HospitalPage {
+  items: AdminHospital[];
+  total: number;
+  limit: number;
+  offset: number;
+}
