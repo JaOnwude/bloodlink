@@ -21,8 +21,11 @@ interface AuthContextValue {
   user: SessionUser | null;
   /** Lets components distinguish "still checking" from "definitely signed out". */
   status: AuthStatus;
-  /** Re-queries the API for the current user, for example right after signing in. */
-  refresh: () => Promise<void>;
+  /**
+   * Re-queries the API for the current user, for example right after signing in.
+   * Resolves with the user, or null when there is no usable session.
+   */
+  refresh: () => Promise<SessionUser | null>;
   /** Ends the session on the server and clears local state. */
   signOut: () => Promise<void>;
 }
@@ -58,7 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refresh = useCallback(async () => {
-    applySession(await fetchSession());
+    const current = await fetchSession();
+    applySession(current);
+    return current;
   }, [applySession]);
 
   const signOut = useCallback(async () => {

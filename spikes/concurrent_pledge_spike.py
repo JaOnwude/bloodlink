@@ -4,7 +4,10 @@ Run (database from docker compose must be up):
     SPIKE_LOCK=1 uv run --project backend python spikes/concurrent_pledge_spike.py   # expect 1 accepted
     SPIKE_LOCK=0 uv run --project backend python spikes/concurrent_pledge_spike.py   # expect 2 accepted (bug)
 """
-import os, sys, threading
+import os
+import sys
+import threading
+
 import psycopg
 
 DSN = os.getenv("SPIKE_DSN", "postgresql://bloodlink:change-me@localhost:5433/bloodlink")

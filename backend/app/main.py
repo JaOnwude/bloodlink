@@ -7,12 +7,17 @@ Run locally from the ``backend`` directory with:
 Interactive documentation is then served at ``/api/v1/docs``.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.router import api_router
 from app.core.config import get_settings
+
+# Prefix pydantic adds to messages that come from our own ValueError checks.
+_VALUE_ERROR_PREFIX = "Value error, "
 
 
 def create_app() -> FastAPI:
@@ -49,6 +54,25 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @application.exception_handler(RequestValidationError)
+    async def handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        """Return validation problems in a compact, safe shape.
+
+        FastAPI's default response echoes the rejected input back to the caller. For a
+        registration request that includes the password, which could then end up in browser
+        tools, proxies or log aggregators. This handler reports only where the problem is
+        and what is wrong, and drops the internal context object that is not JSON-friendly.
+        """
+        errors = [
+            {
+                "loc": list(error["loc"]),
+                "msg": error["msg"].removeprefix(_VALUE_ERROR_PREFIX),
+                "type": error["type"],
+            }
+            for error in exc.errors()
+        ]
+        return JSONResponse(status_code=422, content={"detail": errors})
 
     application.include_router(api_router, prefix=settings.api_prefix)
     return application

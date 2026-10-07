@@ -1,0 +1,59 @@
+/**
+ * A labelled dropdown that uses the browser's native select.
+ *
+ * The native control gives the best behaviour on phones (the system picker), works with
+ * keyboards and screen readers out of the box, and needs no extra code. It is styled to
+ * match the text inputs.
+ */
+
+import { ChevronDown, TriangleAlert } from "lucide-react";
+import type { ComponentProps } from "react";
+
+import { Label } from "@/components/ui/label";
+
+interface SelectFieldProps extends Omit<ComponentProps<"select">, "id" | "className"> {
+  id: string;
+  label: string;
+  hint?: string;
+  error?: string;
+}
+
+export function SelectField({ id, label, hint, error, children, ...selectProps }: SelectFieldProps) {
+  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
+  const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(" ");
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-sm font-medium text-ink">
+        {label}
+      </Label>
+      <div className="relative">
+        <select
+          id={id}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy || undefined}
+          className="h-12 w-full appearance-none rounded-xl border border-input bg-surface px-4 pr-11 text-base text-ink transition-[border-color,box-shadow] duration-150 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
+          {...selectProps}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-ink-muted"
+          aria-hidden="true"
+        />
+      </div>
+      {error ? (
+        <p id={errorId} className="flex items-start gap-1.5 text-sm text-danger">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>{error}</span>
+        </p>
+      ) : null}
+      {hint ? (
+        <p id={hintId} className="text-sm text-ink-muted">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  );
+}

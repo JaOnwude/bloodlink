@@ -2,78 +2,108 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * BloodLink design tokens
+ * ----------------------------------------------------------------------------
+ * This file is the single source of truth for colour, type, radius, shadow and
+ * motion values. Components reference these tokens (for example `bg-primary-600`,
+ * `text-ink-muted`, `shadow-soft`, `text-display`) and never hard-code design values.
+ *
+ * The site is light-only. The `dark` variant is bound to a class that is never applied,
+ * so the operating system's dark mode cannot partially restyle components.
+ */
+
 @custom-variant dark (&:is(.dark *));
 
+/* ---------------------------------------------------------------------------
+ * 1. Semantic tokens used by the shadcn/ui components
+ * ------------------------------------------------------------------------- */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  color-scheme: light;
+
+  --background: #fbf8f5;
+  --foreground: #16181d;
+  --card: #ffffff;
+  --card-foreground: #16181d;
+  --popover: #ffffff;
+  --popover-foreground: #16181d;
+  --primary: #b91c32;
+  --primary-foreground: #ffffff;
+  --secondary: #f3eee9;
+  --secondary-foreground: #16181d;
+  --muted: #f3eee9;
+  --muted-foreground: #5a6270;
+  --accent: #fdecee;
+  --accent-foreground: #9a1429;
+  --destructive: #b42318;
+  --border: #e8e2dc;
+  /* Form-control borders need stronger contrast than decorative dividers (WCAG 1.4.11). */
+  --input: #968e84;
+  --ring: #b91c32;
+
+  --chart-1: #b91c32;
+  --chart-2: #0f766e;
+  --chart-3: #b45309;
+  --chart-4: #5a6270;
+  --chart-5: #16181d;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #16181d;
+  --sidebar-primary: #b91c32;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fdecee;
+  --sidebar-accent-foreground: #9a1429;
+  --sidebar-border: #e8e2dc;
+  --sidebar-ring: #b91c32;
+
+  /* Corner radius base. Derived radii below scale from it. */
+  --radius: 0.875rem;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-reveal: 600ms;
+
+  /* Vertical rhythm between page sections */
+  --section-y: clamp(4rem, 10vw, 8rem);
 }
 
+/* ---------------------------------------------------------------------------
+ * 2. Mapping of the tokens above to Tailwind utilities
+ * ------------------------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,63 +111,124 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* The font variables are set on :root by pages/_app.tsx from next/font. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font-heading: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ---------------------------------------------------------------------------
+ * 3. BloodLink brand tokens
+ * ------------------------------------------------------------------------- */
+@theme {
+  /* Neutrals */
+  --color-canvas: #fbf8f5;
+  --color-surface: #ffffff;
+  --color-ink: #16181d;
+  --color-ink-muted: #5a6270;
+  --color-ivory: #f6efe9;
+  --color-night: #1b0f13;
+
+  /* Brand crimson. 600 is the button colour and passes AA with white text. */
+  --color-primary-50: #fdecee;
+  --color-primary-100: #fad1d6;
+  --color-primary-500: #d32f45;
+  --color-primary-600: #b91c32;
+  --color-primary-700: #9a1429;
+  --color-primary-900: #4a0a14;
+
+  /* Trust teal, reserved for "verified" and similar signals. */
+  --color-trust-50: #e6f4f2;
+  --color-trust-600: #0f766e;
+  --color-trust-700: #0b5e58;
+
+  /* Status colours. Always pair with an icon and text, never colour alone. */
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b42318;
+
+  /* Fluid type scale */
+  --text-display: clamp(2.5rem, 1.2rem + 5vw, 4.5rem);
+  --text-display--line-height: 1.05;
+  --text-title: clamp(2rem, 1.3rem + 2.6vw, 3rem);
+  --text-title--line-height: 1.12;
+  --text-heading: clamp(1.5rem, 1.15rem + 1.3vw, 2rem);
+  --text-heading--line-height: 1.2;
+  --text-lead: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  --text-lead--line-height: 1.6;
+
+  /* Container widths */
+  --container-content: 75rem;
+  --container-wide: 85rem;
+  --container-reading: 42.5rem;
+
+  /* Warm-tinted shadows */
+  --shadow-soft: 0 1px 2px rgb(74 10 20 / 0.06), 0 4px 12px rgb(74 10 20 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(74 10 20 / 0.06), 0 12px 32px rgb(74 10 20 / 0.1);
+  --shadow-pop: 0 4px 8px rgb(74 10 20 / 0.08), 0 24px 56px rgb(74 10 20 / 0.16);
+
+  /* Easing */
+  --ease-brand: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Standard vertical padding for a page section. */
+@utility py-section {
+  padding-block: var(--section-y);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
+/* ---------------------------------------------------------------------------
+ * 4. Base styles
+ * ------------------------------------------------------------------------- */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    @apply font-sans antialiased;
+    scroll-padding-top: 5rem;
+  }
+
   body {
     @apply bg-background text-foreground;
   }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading text-balance;
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: var(--color-primary-100);
+    color: var(--color-primary-900);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 5. Scroll reveal
+ * ----------------------------------------------------------------------------
+ * Content is hidden only when JavaScript is available (the `js` class is added to <html>
+ * by pages/_document.tsx before first paint) and the visitor has not asked for reduced
+ * motion. Without JavaScript, or with reduced motion, everything is simply visible.
+ */
+@media (prefers-reduced-motion: no-preference) {
   html {
-    @apply font-sans;
+    scroll-behavior: smooth;
+  }
+
+  .reveal {
+    transition:
+      opacity var(--duration-reveal) var(--ease-brand) var(--reveal-delay, 0ms),
+      transform var(--duration-reveal) var(--ease-brand) var(--reveal-delay, 0ms);
+  }
+
+  .js .reveal:not([data-revealed="true"]) {
+    opacity: 0;
+    transform: translateY(16px);
   }
 }
