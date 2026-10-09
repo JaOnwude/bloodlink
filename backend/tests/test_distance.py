@@ -4,7 +4,12 @@ from math import asin, atan2, cos, degrees, radians, sin
 
 import pytest
 
-from app.services.distance import EARTH_RADIUS_KM, bounding_box, haversine_km
+from app.services.distance import (
+    EARTH_RADIUS_KM,
+    approximate_position,
+    bounding_box,
+    haversine_km,
+)
 
 LAGOS = (6.5244, 3.3792)
 ABUJA = (9.0765, 7.3986)
@@ -21,9 +26,7 @@ def destination_point(
     delta = distance_km / EARTH_RADIUS_KM
     phi1, lam1, theta = radians(lat), radians(lon), radians(bearing_degrees)
     phi2 = asin(sin(phi1) * cos(delta) + cos(phi1) * sin(delta) * cos(theta))
-    lam2 = lam1 + atan2(
-        sin(theta) * sin(delta) * cos(phi1), cos(delta) - sin(phi1) * sin(phi2)
-    )
+    lam2 = lam1 + atan2(sin(theta) * sin(delta) * cos(phi1), cos(delta) - sin(phi1) * sin(phi2))
     return degrees(phi2), degrees(lam2)
 
 
@@ -100,3 +103,11 @@ def test_a_circle_that_reaches_a_pole_covers_every_longitude() -> None:
     assert box.min_lon == -180.0
     assert box.max_lon == 180.0
     assert box.max_lat == 90.0
+
+
+def test_approximate_positions_hide_the_exact_point() -> None:
+    # Two homes a few hundred metres apart land on the same grid point.
+    first = approximate_position(6.534567, 3.384321)
+    second = approximate_position(6.531200, 3.381900)
+
+    assert first == second == (6.53, 3.38)
