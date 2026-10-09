@@ -1,14 +1,24 @@
 /**
- * Small pills showing a blood request's state and how urgent it is.
+ * Small pills showing a blood request's state, how urgent it is, and where a pledge stands.
  *
  * Each value has its own colour, icon and wording, so the meaning never depends on colour
  * alone.
  */
 
-import { CircleCheck, CircleSlash, Clock, Flame, Hourglass, Siren, TimerOff } from "lucide-react";
+import {
+  CircleCheck,
+  CircleSlash,
+  Clock,
+  Flame,
+  HeartHandshake,
+  Hourglass,
+  Siren,
+  TimerOff,
+  UserX,
+} from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { RequestStatus, RequestUrgency } from "@/types/api";
+import type { PledgeStatus, RequestStatus, RequestUrgency } from "@/types/api";
 
 interface PillStyle {
   label: string;
@@ -81,4 +91,31 @@ export function RequestStatusBadge({ status }: { status: RequestStatus }) {
 
 export function UrgencyBadge({ urgency }: { urgency: RequestUrgency }) {
   return <Pill style={urgencyStyles[urgency]} />;
+}
+
+const pledgeStyles: Record<PledgeStatus, PillStyle> = {
+  pledged: {
+    label: "Pledged",
+    tone: "bg-primary-50 text-primary-700",
+    icon: <HeartHandshake className="size-4" aria-hidden="true" />,
+  },
+  donated: {
+    label: "Donated",
+    tone: "bg-trust-50 text-trust-700",
+    icon: <CircleCheck className="size-4" aria-hidden="true" />,
+  },
+  no_show: {
+    label: "Did not attend",
+    tone: "bg-secondary text-ink",
+    icon: <UserX className="size-4" aria-hidden="true" />,
+  },
+  cancelled: {
+    label: "Cancelled",
+    tone: "bg-secondary text-ink-muted",
+    icon: <CircleSlash className="size-4" aria-hidden="true" />,
+  },
+};
+
+export function PledgeStatusBadge({ status }: { status: PledgeStatus }) {
+  return <Pill style={pledgeStyles[status]} />;
 }
