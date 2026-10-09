@@ -21,10 +21,31 @@ export const siteConfig = {
     "BloodLink matches verified hospitals with compatible, eligible donors nearby, then tracks every pledge through to a confirmed donation.",
 
   /** Links shown in the main navigation. */
-  nav: [] as NavItem[],
+  nav: [
+    { label: "How it works", href: "/#how-it-works" },
+    { label: "Pricing", href: "/#pricing" },
+    { label: "For donors", href: "/#donors" },
+  ] as NavItem[],
 
   /** Link columns shown in the footer. Empty groups are not rendered. */
-  footerGroups: [] as FooterGroup[],
+  footerGroups: [
+    {
+      title: "Hospitals",
+      links: [
+        { label: "How it works", href: "/#how-it-works" },
+        { label: "Pricing", href: "/#pricing" },
+        { label: "Register your hospital", href: "/register?as=hospital" },
+      ],
+    },
+    {
+      title: "Donors",
+      links: [
+        { label: "Why donate", href: "/#donors" },
+        { label: "Become a donor", href: "/register" },
+        { label: "Sign in", href: "/login" },
+      ],
+    },
+  ] as FooterGroup[],
 
   /** Where the account buttons in the header lead. */
   accountLinks: {
