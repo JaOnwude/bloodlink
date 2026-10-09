@@ -49,6 +49,48 @@ def whole_blood_interval(db_session: Session) -> int:
 # ---------------------------------------------------------------------------------------
 
 
+# The red-cell compatibility chart, typed out independently of the seed data, so the test
+# checks the rules table against the published chart rather than against itself.
+_CHART: dict[BloodGroup, set[BloodGroup]] = {
+    BloodGroup.O_NEGATIVE: {BloodGroup.O_NEGATIVE},
+    BloodGroup.O_POSITIVE: {BloodGroup.O_POSITIVE, BloodGroup.O_NEGATIVE},
+    BloodGroup.A_NEGATIVE: {BloodGroup.A_NEGATIVE, BloodGroup.O_NEGATIVE},
+    BloodGroup.A_POSITIVE: {
+        BloodGroup.A_POSITIVE,
+        BloodGroup.A_NEGATIVE,
+        BloodGroup.O_POSITIVE,
+        BloodGroup.O_NEGATIVE,
+    },
+    BloodGroup.B_NEGATIVE: {BloodGroup.B_NEGATIVE, BloodGroup.O_NEGATIVE},
+    BloodGroup.B_POSITIVE: {
+        BloodGroup.B_POSITIVE,
+        BloodGroup.B_NEGATIVE,
+        BloodGroup.O_POSITIVE,
+        BloodGroup.O_NEGATIVE,
+    },
+    BloodGroup.AB_NEGATIVE: {
+        BloodGroup.AB_NEGATIVE,
+        BloodGroup.A_NEGATIVE,
+        BloodGroup.B_NEGATIVE,
+        BloodGroup.O_NEGATIVE,
+    },
+    BloodGroup.AB_POSITIVE: set(BloodGroup),
+}
+
+
+@pytest.mark.parametrize("recipient", list(BloodGroup), ids=lambda group: group.value)
+def test_every_recipient_group_matches_exactly_the_charted_donor_groups(
+    db_session: Session, reference_data: None, recipient: BloodGroup
+) -> None:
+    _, hospital, request = setup(db_session, recipient_group=recipient)
+    for number, group in enumerate(BloodGroup):
+        make_donor_record(db_session, email=f"d{number}@example.com", blood_group=group)
+
+    matches, _ = search(db_session, request, hospital)
+
+    assert groups_of(matches) == _CHART[recipient]
+
+
 def test_o_negative_patients_match_only_o_negative_donors(
     db_session: Session, reference_data: None
 ) -> None:
