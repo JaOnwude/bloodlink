@@ -71,3 +71,17 @@ def bounding_box(lat: float, lon: float, radius_km: float) -> BoundingBox:
         min_lon=lon - lon_delta,
         max_lon=lon + lon_delta,
     )
+
+
+# Decimal places kept when a donor's position is shown on a map. Two places is a grid of
+# about 1.1 km: enough to show where donors are clustered, too coarse to find a home.
+APPROXIMATE_DECIMALS = 2
+
+
+def approximate_position(latitude: float, longitude: float) -> tuple[float, float]:
+    """Snap a position to a grid of about a kilometre, for showing donors on a map.
+
+    Every donor in the same grid square gets the same position, so the map reveals the
+    neighbourhood, never the address. Exact coordinates stay on the server.
+    """
+    return round(latitude, APPROXIMATE_DECIMALS), round(longitude, APPROXIMATE_DECIMALS)

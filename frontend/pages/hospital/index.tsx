@@ -23,7 +23,7 @@ import { RouteGuard } from "@/components/RouteGuard";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatTimestamp } from "@/lib/format";
+import { formatTimestamp, placeName } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
 import type { Hospital, RequestPage } from "@/types/api";
 
@@ -228,7 +228,7 @@ function DashboardContent() {
             <CardContent className="space-y-6">
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Address" value={record.address} />
-                <Detail label="City" value={`${record.city}, ${record.state}`} />
+                <Detail label="City" value={placeName(record.city, record.state)} />
                 <Detail label="Contact phone" value={record.contact_phone} />
                 <Detail
                   label="Registration number"

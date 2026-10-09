@@ -106,12 +106,19 @@ class MatchRead(BaseModel):
 
     Deliberately anonymous: no name, phone number, email or exact location. A hospital sees
     a donor's contact details only after that donor pledges.
+
+    Attributes:
+        approx_latitude: The donor's latitude snapped to a grid of about a kilometre, for
+            the map. Donors in the same square share a position.
+        approx_longitude: The longitude, snapped the same way.
     """
 
     donor_id: UUID
     blood_group: BloodGroup
     city: str
     distance_km: float
+    approx_latitude: float
+    approx_longitude: float
 
 
 class MatchesResponse(BaseModel):

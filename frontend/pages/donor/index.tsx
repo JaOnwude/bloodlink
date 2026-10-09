@@ -1,17 +1,20 @@
 /**
- * Donor dashboard: eligibility today, the donor's profile and the alerts switch.
+ * Donor dashboard: eligibility today, the profile and alerts switch, the open requests the
+ * donor can answer, and their pledges.
  *
  * A donor who has not created a profile yet is invited to do so. Data loads only after the
  * route guard has confirmed the visitor is a signed-in donor, so no request is made for
  * anyone else.
  */
 
-import { BellOff } from "lucide-react";
+import { BellOff, HeartPulse } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
 
 import { AvailabilityToggle } from "@/components/donor/AvailabilityToggle";
 import { EligibilityCard } from "@/components/donor/EligibilityCard";
+import { OpenRequestCard } from "@/components/donor/OpenRequestCard";
+import { PledgeHistory } from "@/components/donor/PledgeHistory";
 import { ProfileSummary } from "@/components/donor/ProfileSummary";
 import { Container } from "@/components/layout/Container";
 import { LoadError } from "@/components/layout/LoadError";
@@ -24,7 +27,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { useResource } from "@/lib/use-resource";
-import type { DonorProfile, Eligibility } from "@/types/api";
+import type {
+  DonorPledgePage,
+  DonorProfile,
+  Eligibility,
+  OpenRequestsForDonor,
+} from "@/types/api";
+
+// The radius the server searches when none is given; shown until the answer arrives.
+const DEFAULT_RADIUS_KM = 25;
+// How many pledges the dashboard lists.
+const HISTORY_SHOWN = 10;
 
 function DashboardSkeleton() {
   return (
@@ -58,6 +71,93 @@ function Onboarding() {
         </CardContent>
       </Card>
     </Reveal>
+  );
+}
+
+function SectionSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-4" role="status" aria-label={label}>
+      <Skeleton className="h-40" />
+      <Skeleton className="h-40" />
+    </div>
+  );
+}
+
+/**
+ * The open requests the donor can answer, and their own pledges.
+ *
+ * Both lists are reloaded together after any pledge or cancellation, because one change
+ * affects both: a new pledge marks the request card and adds a history entry.
+ */
+function Activity() {
+  const requests = useResource<OpenRequestsForDonor>("/donors/me/requests");
+  const pledges = useResource<DonorPledgePage>(`/donors/me/pledges?limit=${HISTORY_SHOWN}`);
+
+  function reloadBoth() {
+    requests.reload();
+    pledges.reload();
+  }
+
+  const activePledge = pledges.data?.items.find((item) => item.status === "pledged") ?? null;
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+      <Reveal className="space-y-4">
+        <div>
+          <h2 className="text-heading font-semibold text-ink">Requests near you</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Verified hospitals within {requests.data?.radius_km ?? DEFAULT_RADIUS_KM} km that
+            need your blood group, and that you can give to today. Most urgent first.
+          </p>
+        </div>
+        {!requests.loaded ? (
+          <SectionSkeleton label="Loading requests near you" />
+        ) : requests.error || !requests.data ? (
+          <LoadError
+            message="We could not load requests near you. Check your connection and try again."
+            onRetry={requests.reload}
+          />
+        ) : requests.data.items.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input bg-surface px-6 py-10 text-center">
+            <HeartPulse className="size-8 text-ink-muted" aria-hidden="true" />
+            <p className="text-ink">No hospital near you needs your blood group right now.</p>
+            <p className="max-w-md text-sm text-ink-muted">
+              Keep your alerts on and we will let you know when one does.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-4">
+            {requests.data.items.map((item) => (
+              <li key={item.id}>
+                <OpenRequestCard
+                  request={item}
+                  pledgedElsewhere={activePledge !== null && activePledge.request.id !== item.id}
+                  onChanged={reloadBoth}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Reveal>
+
+      <Reveal delay={80} className="space-y-4">
+        <h2 className="text-heading font-semibold text-ink">Your pledges</h2>
+        {!pledges.loaded ? (
+          <SectionSkeleton label="Loading your pledges" />
+        ) : pledges.error || !pledges.data ? (
+          <LoadError
+            message="We could not load your pledges. Check your connection and try again."
+            onRetry={pledges.reload}
+          />
+        ) : (
+          <PledgeHistory
+            pledges={pledges.data.items}
+            total={pledges.data.total}
+            onChanged={reloadBoth}
+          />
+        )}
+      </Reveal>
+    </div>
   );
 }
 
@@ -130,6 +230,8 @@ function DashboardContent() {
           <AvailabilityToggle available={donor.is_available} onChange={saveAvailability} />
         </Reveal>
       </div>
+
+      <Activity />
     </div>
   );
 }

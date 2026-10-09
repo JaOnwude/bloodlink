@@ -214,3 +214,18 @@ def request_payload(**overrides: object) -> dict[str, object]:
     }
     body.update(overrides)
     return body
+
+
+# Central Lagos, where the default test hospital is.
+LAGOS = {"latitude": 6.5244, "longitude": 3.3792, "city": "Lagos"}
+
+
+def make_signed_in_donor(client: TestClient, *, email: str, **profile: object) -> str:
+    """Register a donor through the API, create their profile in Lagos, and stay signed in.
+
+    Profile fields can be replaced by keyword arguments. Returns the donor profile's id.
+    """
+    register_user(client, email=email, role="donor")
+    response = client.put(f"{API}/donors/me", json=donor_payload(**{**LAGOS, **profile}))
+    assert response.status_code == 201, response.text
+    return response.json()["id"]

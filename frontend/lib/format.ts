@@ -77,3 +77,24 @@ export function toLocalInputValue(date: Date): string {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   );
 }
+
+/** A link that opens OpenStreetMap at a point, for directions to a hospital. */
+export function mapLinkFor(latitude: number, longitude: number): string {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`;
+}
+
+/**
+ * A blood group with the right indefinite article, as in "an O- patient" or "a B+ patient".
+ * Groups are read aloud by their letters, and "A", "AB" and "O" begin with a vowel sound.
+ */
+export function withArticle(group: string): string {
+  return group.startsWith("B") ? `a ${group}` : `an ${group}`;
+}
+
+/**
+ * A city and its state for display, without repeating a name: "Enugu, Enugu" becomes
+ * "Enugu", while "Ikeja, Lagos" is kept as it is.
+ */
+export function placeName(city: string, state: string): string {
+  return city.trim().toLowerCase() === state.trim().toLowerCase() ? city : `${city}, ${state}`;
+}

@@ -111,3 +111,13 @@ def client(db_engine: Engine, clean_database: None) -> Generator[TestClient, Non
 def reference_data(db_session: Session) -> None:
     """Load the blood compatibility chart and component types into the test database."""
     seed_reference_data(db_session)
+
+
+@pytest.fixture(autouse=True)
+def never_send_real_sms(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the console sender in every test, whatever ``.env`` says.
+
+    Termii has no sandbox, so a test that reached it would send a real, paid message. Tests
+    that check the Termii sender build it themselves with a mock transport.
+    """
+    monkeypatch.setattr(get_settings(), "sms_provider", "console")

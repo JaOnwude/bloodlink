@@ -174,6 +174,9 @@ export interface DonorMatch {
   blood_group: BloodGroup;
   city: string;
   distance_km: number;
+  /** Position rounded to about a kilometre, for the map. Never the exact location. */
+  approx_latitude: number;
+  approx_longitude: number;
 }
 
 /** The donors matching a request, nearest first, and the radius that was searched. */
@@ -181,4 +184,123 @@ export interface MatchesResponse {
   items: DonorMatch[];
   total: number;
   radius_km: number;
+}
+
+/** Where a donor's commitment to a request stands. */
+export type PledgeStatus = "pledged" | "donated" | "no_show" | "cancelled";
+
+/** A pledge after a change, with the effect on its request. */
+export interface PledgeResult {
+  id: string;
+  request_id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  request_status: RequestStatus;
+  units_remaining: number;
+}
+
+/**
+ * The donor behind a pledge, as the hospital sees them. The contact fields are null for a
+ * cancelled pledge.
+ */
+export interface PledgedDonor {
+  donor_id: string;
+  blood_group: BloodGroup;
+  city: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+/** A pledge to one of the hospital's requests. */
+export interface HospitalPledge {
+  id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  donor: PledgedDonor;
+}
+
+/** Where to go and whom to call, as shown to a donor. */
+export interface HospitalSummary {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  contact_phone: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** The request a donor's pledge is for. */
+export interface DonorRequestSummary {
+  id: string;
+  recipient_group: BloodGroup;
+  component_name: string;
+  urgency: RequestUrgency;
+  deadline: string;
+  notes: string | null;
+  status: RequestStatus;
+}
+
+/** One of the donor's own pledges. */
+export interface DonorPledge {
+  id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  request: DonorRequestSummary;
+  hospital: HospitalSummary;
+}
+
+/** One page of the donor's pledges, most recent first. */
+export interface DonorPledgePage {
+  items: DonorPledge[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** An open request the donor can answer, with the donor's own pledge if they made one. */
+export interface OpenRequestForDonor {
+  id: string;
+  recipient_group: BloodGroup;
+  component_code: string;
+  component_name: string;
+  urgency: RequestUrgency;
+  deadline: string;
+  notes: string | null;
+  units_remaining: number;
+  distance_km: number;
+  hospital: HospitalSummary;
+  my_pledge_id: string | null;
+}
+
+/** The open requests a donor can answer, and the radius searched. */
+export interface OpenRequestsForDonor {
+  items: OpenRequestForDonor[];
+  radius_km: number;
+}
+
+/** How many donors have been texted about a request, and through which sender. */
+export interface AlertSummary {
+  sent: number;
+  failed: number;
+  queued: number;
+  total: number;
+  /** "termii" for real messages; "console" when messages are only recorded. */
+  provider: "termii" | "console";
+}
+
+/** What one request to alert donors did, followed by the request's totals. */
+export interface AlertRun {
+  matched: number;
+  newly_alerted: number;
+  sent: number;
+  failed: number;
+  already_alerted: number;
+  without_phone: number;
+  totals: AlertSummary;
 }

@@ -7,13 +7,22 @@
  *
  * Every donor shown is compatible with the patient, available, has agreed to be contacted
  * and is eligible to give the requested component today; the server applies those rules.
+ *
+ * A map above the list shows the hospital, the search radius and where the donors are, to
+ * the nearest kilometre.
+ *
+ * Below the list, the alert panel shows how many donors have been texted and can text the
+ * donors at the chosen radius who have not been alerted yet.
  */
 
 import { MapPin, ShieldCheck, Users } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { SelectField } from "@/components/form/SelectField";
+import { AlertPanel } from "@/components/requests/AlertPanel";
 import { LoadError } from "@/components/layout/LoadError";
+import { MapPanel } from "@/components/map/MapPanel";
+import type { MapDonor } from "@/components/map/RequestMap";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useResource } from "@/lib/use-resource";
 import type { MatchesResponse } from "@/types/api";
@@ -26,10 +35,29 @@ function formatDistance(km: number): string {
   return km < 1 ? "under 1 km" : `${km.toFixed(1)} km`;
 }
 
-export function MatchList({ requestId }: { requestId: string }) {
+interface MatchListProps {
+  requestId: string;
+  /** Where the hospital is, for the map. The map is left out until it is known. */
+  hospital: { name: string; latitude: number; longitude: number } | null;
+}
+
+export function MatchList({ requestId, hospital }: MatchListProps) {
   const [radius, setRadius] = useState(DEFAULT_RADIUS);
   const matches = useResource<MatchesResponse>(
     `/requests/${requestId}/matches?radius_km=${radius}`,
+  );
+  // The map stays mounted while a new radius loads, so it does not flash; it shows the
+  // donors once they arrive.
+  const mapDonors = useMemo<MapDonor[]>(
+    () =>
+      (matches.data?.items ?? []).map((match) => ({
+        id: match.donor_id,
+        bloodGroup: match.blood_group,
+        latitude: match.approx_latitude,
+        longitude: match.approx_longitude,
+        distanceKm: match.distance_km,
+      })),
+    [matches.data],
   );
 
   return (
@@ -48,6 +76,8 @@ export function MatchList({ requestId }: { requestId: string }) {
           ))}
         </SelectField>
       </div>
+
+      {hospital ? <MapPanel hospital={hospital} radiusKm={radius} donors={mapDonors} /> : null}
 
       {!matches.loaded ? (
         <div className="space-y-3" role="status" aria-label="Finding donors">
@@ -105,6 +135,8 @@ export function MatchList({ requestId }: { requestId: string }) {
           </ol>
         </>
       )}
+
+      <AlertPanel requestId={requestId} radiusKm={radius} />
 
       <p className="flex items-start gap-2 text-sm text-ink-muted">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-trust-600" aria-hidden="true" />
