@@ -1,12 +1,14 @@
 /**
- * Hospital dashboard: the facility's details and where it stands in the review.
+ * Hospital dashboard: open blood requests, the facility's details and its review status.
  *
  * Staff who have not registered a hospital yet are invited to. The page explains what each
  * verification state means and what to do next, including how to correct and resubmit after
- * a rejection. Data loads only after the route guard has confirmed the visitor is signed-in
- * hospital staff.
+ * a rejection. Once the hospital is verified, its open requests are listed at the top with a
+ * shortcut to raise a new one. Data loads only after the route guard has confirmed the
+ * visitor is signed-in hospital staff.
  */
 
+import { Inbox, Plus } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
 
@@ -16,13 +18,17 @@ import { Container } from "@/components/layout/Container";
 import { LoadError } from "@/components/layout/LoadError";
 import { Section } from "@/components/layout/Section";
 import { Reveal } from "@/components/motion/Reveal";
+import { RequestSummaryCard } from "@/components/requests/RequestSummaryCard";
 import { RouteGuard } from "@/components/RouteGuard";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimestamp } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
-import type { Hospital } from "@/types/api";
+import type { Hospital, RequestPage } from "@/types/api";
+
+/** How many open requests the dashboard shows before linking to the full list. */
+const OPEN_REQUESTS_SHOWN = 3;
 
 function DashboardSkeleton() {
   return (
@@ -68,7 +74,6 @@ function StatusMessage({ hospital }: { hospital: Hospital }) {
           {hospital.verified_at ? `Verified on ${formatTimestamp(hospital.verified_at)}. ` : ""}
           Donors will see requests from {hospital.name} as coming from a verified hospital.
         </p>
-        <p>Raising blood requests is the next feature to arrive here.</p>
       </div>
     );
   }
@@ -112,6 +117,65 @@ function Detail({ label, value }: { label: string; value: string }) {
   );
 }
 
+function OpenRequests() {
+  const page = useResource<RequestPage>(`/requests?status=open&limit=${OPEN_REQUESTS_SHOWN}`);
+  const more = page.data ? page.data.total - page.data.items.length : 0;
+
+  return (
+    <Reveal className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-heading font-semibold text-ink">Open requests</h2>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/hospital/requests"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            All requests
+          </Link>
+          <Link href="/hospital/requests/new" className={buttonVariants({ size: "sm" })}>
+            <Plus /> New request
+          </Link>
+        </div>
+      </div>
+
+      {!page.loaded ? (
+        <Skeleton className="h-32" role="status" aria-label="Loading open requests" />
+      ) : page.error || !page.data ? (
+        <LoadError
+          message="We could not load your open requests. Check your connection and try again."
+          onRetry={page.reload}
+        />
+      ) : page.data.items.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-input bg-surface px-6 py-10 text-center">
+          <Inbox className="size-8 text-ink-muted" aria-hidden="true" />
+          <p className="text-ink">No open requests. Raise one when a patient needs blood.</p>
+        </div>
+      ) : (
+        <>
+          <ul className="space-y-4">
+            {page.data.items.map((request) => (
+              <li key={request.id}>
+                <RequestSummaryCard request={request} />
+              </li>
+            ))}
+          </ul>
+          {more > 0 ? (
+            <p className="text-sm text-ink-muted">
+              {more} more open {more === 1 ? "request" : "requests"}.{" "}
+              <Link
+                href="/hospital/requests"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                See them all
+              </Link>
+            </p>
+          ) : null}
+        </>
+      )}
+    </Reveal>
+  );
+}
+
 function DashboardContent() {
   const hospital = useResource<Hospital>("/hospitals/me");
 
@@ -136,6 +200,8 @@ function DashboardContent() {
         <h1 className="text-title font-semibold text-ink">{record.name}</h1>
         <VerificationBadge status={record.verification_status} />
       </Reveal>
+
+      {record.verification_status === "verified" ? <OpenRequests /> : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Reveal>

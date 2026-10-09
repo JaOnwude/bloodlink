@@ -121,3 +121,64 @@ export interface HospitalPage {
   limit: number;
   offset: number;
 }
+
+/** A blood component that a request can ask for, such as whole blood or platelets. */
+export interface BloodComponent {
+  code: string;
+  name: string;
+}
+
+/** How quickly a hospital needs the blood. */
+export type RequestUrgency = "critical" | "urgent" | "routine";
+
+/** Where a blood request is in its life. */
+export type RequestStatus = "open" | "fulfilled" | "closed" | "expired";
+
+/**
+ * A blood request as shown to the staff of the hospital that raised it.
+ *
+ * `units_pledged` counts donors who have committed or already given; `units_remaining` is
+ * what is still needed. Timestamps are ISO date-times in UTC.
+ */
+export interface BloodRequest {
+  id: string;
+  hospital_id: string;
+  recipient_group: BloodGroup;
+  component_code: string;
+  component_name: string;
+  units_needed: number;
+  units_pledged: number;
+  units_remaining: number;
+  urgency: RequestUrgency;
+  deadline: string;
+  notes: string | null;
+  status: RequestStatus;
+  fulfilled_at: string | null;
+  created_at: string;
+}
+
+/** One page of a hospital's requests. */
+export interface RequestPage {
+  items: BloodRequest[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/**
+ * A donor who can answer a request. Deliberately anonymous: the hospital sees contact
+ * details only after the donor pledges.
+ */
+export interface DonorMatch {
+  donor_id: string;
+  blood_group: BloodGroup;
+  city: string;
+  distance_km: number;
+}
+
+/** The donors matching a request, nearest first, and the radius that was searched. */
+export interface MatchesResponse {
+  items: DonorMatch[];
+  total: number;
+  radius_km: number;
+}
