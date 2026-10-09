@@ -5,7 +5,7 @@ New route modules are registered here, so ``main.py`` stays unchanged as the API
 
 from fastapi import APIRouter
 
-from app.api.routes import admin, auth, donors, health, hospitals, requests
+from app.api.routes import admin, auth, components, donors, health, hospitals, requests
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -14,3 +14,4 @@ api_router.include_router(donors.router)
 api_router.include_router(hospitals.router)
 api_router.include_router(admin.router)
 api_router.include_router(requests.router)
+api_router.include_router(components.router)
