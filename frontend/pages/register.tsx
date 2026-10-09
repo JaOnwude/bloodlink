@@ -6,11 +6,15 @@
  * first (missing fields, a password that is too short); the server applies the full rules and
  * any problem it finds is shown beside the field it concerns. Registering also signs the new
  * user in, after which the visitor is sent on.
+ *
+ * A link can preselect the account type with `?as=hospital`, as the landing page's
+ * "Register your hospital" button does. Donor is the default.
  */
 
 import { CircleAlert } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useState } from "react";
 import type { FormEvent } from "react";
 
@@ -33,12 +37,12 @@ import { useRedirectIfSignedIn } from "@/lib/use-redirect-if-signed-in";
 
 const FIELD_ORDER = ["full_name", "email", "phone", "password"];
 
-export default function RegisterPage() {
+function RegisterForm({ initialRole }: { initialRole: SelfServiceRole }) {
   const { refresh } = useAuth();
   // Signed-in visitors are redirected by this hook once the session is confirmed.
   const requestedPath = useRedirectIfSignedIn();
 
-  const [role, setRole] = useState<SelfServiceRole>("donor");
+  const [role, setRole] = useState<SelfServiceRole>(initialRole);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -199,4 +203,13 @@ export default function RegisterPage() {
       </AuthShell>
     </>
   );
+}
+
+export default function RegisterPage() {
+  const router = useRouter();
+  // The address is only readable once the router is ready, after the first render. Keying the
+  // form on the role remounts it with the right choice before the visitor has typed anything.
+  const initialRole: SelfServiceRole =
+    router.isReady && router.query.as === "hospital" ? "hospital_staff" : "donor";
+  return <RegisterForm key={initialRole} initialRole={initialRole} />;
 }

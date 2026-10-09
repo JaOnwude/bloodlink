@@ -17,4 +17,13 @@ RUN uv sync --no-dev --no-install-project
 COPY . .
 
 EXPOSE 8000
-CMD ["uv", "run", "--no-dev", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# On every start: bring the database schema up to date, make sure the reference data (the
+# compatibility chart and component types) is present, then serve. Both steps are safe to
+# repeat, so a restart never needs a manual step, which matters on hosts without a shell.
+#
+# The port comes from $PORT when the host sets one (Render does) and is 8000 otherwise.
+# --proxy-headers makes the API see each visitor's address rather than the host's proxy,
+# which the sign-in rate limit and the audit log rely on. Forwarded headers are trusted from
+# any address because the container is only reachable through the host's proxy.
+CMD ["sh", "-c", "uv run --no-dev alembic upgrade head && uv run --no-dev python -m scripts.seed && exec uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
