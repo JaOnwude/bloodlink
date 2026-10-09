@@ -77,3 +77,8 @@ export function toLocalInputValue(date: Date): string {
     `T${pad(date.getHours())}:${pad(date.getMinutes())}`
   );
 }
+
+/** A link that opens OpenStreetMap at a point, for directions to a hospital. */
+export function mapLinkFor(latitude: number, longitude: number): string {
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=16/${latitude}/${longitude}`;
+}

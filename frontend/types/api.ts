@@ -182,3 +182,101 @@ export interface MatchesResponse {
   total: number;
   radius_km: number;
 }
+
+/** Where a donor's commitment to a request stands. */
+export type PledgeStatus = "pledged" | "donated" | "no_show" | "cancelled";
+
+/** A pledge after a change, with the effect on its request. */
+export interface PledgeResult {
+  id: string;
+  request_id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  request_status: RequestStatus;
+  units_remaining: number;
+}
+
+/**
+ * The donor behind a pledge, as the hospital sees them. The contact fields are null for a
+ * cancelled pledge.
+ */
+export interface PledgedDonor {
+  donor_id: string;
+  blood_group: BloodGroup;
+  city: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+/** A pledge to one of the hospital's requests. */
+export interface HospitalPledge {
+  id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  donor: PledgedDonor;
+}
+
+/** Where to go and whom to call, as shown to a donor. */
+export interface HospitalSummary {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  contact_phone: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** The request a donor's pledge is for. */
+export interface DonorRequestSummary {
+  id: string;
+  recipient_group: BloodGroup;
+  component_name: string;
+  urgency: RequestUrgency;
+  deadline: string;
+  notes: string | null;
+  status: RequestStatus;
+}
+
+/** One of the donor's own pledges. */
+export interface DonorPledge {
+  id: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  resolved_at: string | null;
+  request: DonorRequestSummary;
+  hospital: HospitalSummary;
+}
+
+/** One page of the donor's pledges, most recent first. */
+export interface DonorPledgePage {
+  items: DonorPledge[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** An open request the donor can answer, with the donor's own pledge if they made one. */
+export interface OpenRequestForDonor {
+  id: string;
+  recipient_group: BloodGroup;
+  component_code: string;
+  component_name: string;
+  urgency: RequestUrgency;
+  deadline: string;
+  notes: string | null;
+  units_remaining: number;
+  distance_km: number;
+  hospital: HospitalSummary;
+  my_pledge_id: string | null;
+}
+
+/** The open requests a donor can answer, and the radius searched. */
+export interface OpenRequestsForDonor {
+  items: OpenRequestForDonor[];
+  radius_km: number;
+}
