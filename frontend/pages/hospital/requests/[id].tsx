@@ -5,8 +5,8 @@
  * Pledged donors are listed with their contact details and the controls to record whether
  * each one donated or did not attend.
  *
- * While the request is open, the ranked, anonymous list of matching donors is shown with a
- * radius control. Once it is fulfilled, closed or expired, matching stops and the page says
+ * While the request is open, a map and the ranked, anonymous list of matching donors are
+ * shown with a radius control. Once it is fulfilled, closed or expired, matching stops and the page says
  * why. Staff can close an open or fulfilled request from here; the page then reloads so it
  * always shows the current state.
  */
@@ -35,7 +35,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
-import type { BloodRequest, RequestStatus } from "@/types/api";
+import type { BloodRequest, Hospital, RequestStatus } from "@/types/api";
 
 /** Why matching has stopped, for each state other than open. */
 const NOT_MATCHING: Record<Exclude<RequestStatus, "open">, string> = {
@@ -65,6 +65,8 @@ function RequestContent() {
   const router = useRouter();
   const id = router.isReady && typeof router.query.id === "string" ? router.query.id : null;
   const request = useResource<BloodRequest>(id ? `/requests/${id}` : null);
+  // The hospital's position centres the map; the page works without it if it fails.
+  const hospital = useResource<Hospital>("/hospitals/me");
 
   if (!request.loaded) {
     return (
@@ -173,7 +175,11 @@ function RequestContent() {
               {record.status === "open" ? (
                 // Remounting when the pledge count changes refreshes the list, since a
                 // donor who pledges, or whose pledge is resolved, changes who can match.
-                <MatchList key={record.units_pledged} requestId={record.id} />
+                <MatchList
+                  key={record.units_pledged}
+                  requestId={record.id}
+                  hospital={hospital.data}
+                />
               ) : (
                 <p className="rounded-2xl bg-secondary p-4 text-sm text-ink">
                   {NOT_MATCHING[record.status]}

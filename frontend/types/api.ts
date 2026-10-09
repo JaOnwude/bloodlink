@@ -174,6 +174,9 @@ export interface DonorMatch {
   blood_group: BloodGroup;
   city: string;
   distance_km: number;
+  /** Position rounded to about a kilometre, for the map. Never the exact location. */
+  approx_latitude: number;
+  approx_longitude: number;
 }
 
 /** The donors matching a request, nearest first, and the radius that was searched. */
