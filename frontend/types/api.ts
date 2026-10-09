@@ -304,3 +304,23 @@ export interface AlertRun {
   without_phone: number;
   totals: AlertSummary;
 }
+
+/**
+ * A hospital's figures for requests raised in a period. Rates are fractions from 0 to 1,
+ * and null when there is nothing to measure yet.
+ */
+export interface HospitalStats {
+  period_days: number;
+  since: string;
+  requests_raised: number;
+  requests_open: number;
+  requests_finished: number;
+  requests_fulfilled: number;
+  fulfilment_rate: number | null;
+  median_minutes_to_fulfil: number | null;
+  pledges_resolved: number;
+  no_shows: number;
+  no_show_rate: number | null;
+  units_donated: number;
+  donors_alerted: number;
+}

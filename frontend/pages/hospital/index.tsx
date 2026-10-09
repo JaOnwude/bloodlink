@@ -1,5 +1,6 @@
 /**
- * Hospital dashboard: open blood requests, the facility's details and its review status.
+ * Hospital dashboard: open blood requests, performance figures, the facility's details and
+ * its review status.
  *
  * Staff who have not registered a hospital yet are invited to. The page explains what each
  * verification state means and what to do next, including how to correct and resubmit after
@@ -12,6 +13,7 @@ import { Inbox, Plus } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
 
+import { HospitalStats } from "@/components/hospital/HospitalStats";
 import { VerificationBadge } from "@/components/hospital/VerificationBadge";
 import { VerificationSteps } from "@/components/hospital/VerificationSteps";
 import { Container } from "@/components/layout/Container";
@@ -201,7 +203,14 @@ function DashboardContent() {
         <VerificationBadge status={record.verification_status} />
       </Reveal>
 
-      {record.verification_status === "verified" ? <OpenRequests /> : null}
+      {record.verification_status === "verified" ? (
+        <>
+          <OpenRequests />
+          <Reveal>
+            <HospitalStats />
+          </Reveal>
+        </>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Reveal>

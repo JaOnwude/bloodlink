@@ -98,3 +98,22 @@ export function withArticle(group: string): string {
 export function placeName(city: string, state: string): string {
   return city.trim().toLowerCase() === state.trim().toLowerCase() ? city : `${city}, ${state}`;
 }
+
+/** A fraction from 0 to 1 as a whole percentage, such as "67%". */
+export function formatPercent(fraction: number): string {
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * A length of time in minutes, in the largest units that read naturally: "45 min",
+ * "2 h 30 min" or "3 days".
+ */
+export function formatMinutes(minutes: number): string {
+  if (minutes < 60) return `${Math.max(1, Math.round(minutes))} min`;
+  if (minutes < 48 * 60) {
+    const hours = Math.floor(minutes / 60);
+    const rest = Math.round(minutes - hours * 60);
+    return rest > 0 ? `${hours} h ${rest} min` : `${hours} h`;
+  }
+  return `${Math.round(minutes / (24 * 60))} days`;
+}
