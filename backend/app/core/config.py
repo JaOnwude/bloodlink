@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         min_donor_age_years: Lowest permitted donor age, in whole years.
         max_donor_age_years: Highest permitted donor age, in whole years.
         min_donor_weight_kg: Lowest permitted donor body weight.
+        demo_password: Password shared by the demonstration accounts that the demo seed
+            creates. Only the seeding command reads it; the API never does.
+        demo_donor_phone: Optional phone number given to the first demonstration donor,
+            so text-message alerts can be tried on a phone the developer owns.
 
     Note:
         The password limits follow NIST SP 800-63B-4: at least 15 characters when the
@@ -88,6 +92,9 @@ class Settings(BaseSettings):
     min_donor_age_years: int = 18
     max_donor_age_years: int = 65
     min_donor_weight_kg: float = 50.0
+
+    demo_password: str | None = None
+    demo_donor_phone: str | None = None
 
     @property
     def session_cookie_secure(self) -> bool:
