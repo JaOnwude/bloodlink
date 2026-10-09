@@ -1,5 +1,9 @@
 /**
- * One blood request: what was asked for, how far it has got, and the donors who can answer.
+ * One blood request: what was asked for, how far it has got, who has pledged, and the donors
+ * who can answer.
+ *
+ * Pledged donors are listed with their contact details and the controls to record whether
+ * each one donated or did not attend.
  *
  * While the request is open, the ranked, anonymous list of matching donors is shown with a
  * radius control. Once it is fulfilled, closed or expired, matching stops and the page says
@@ -18,6 +22,7 @@ import { Section } from "@/components/layout/Section";
 import { Reveal } from "@/components/motion/Reveal";
 import { CloseRequestPanel } from "@/components/requests/CloseRequestPanel";
 import { MatchList } from "@/components/requests/MatchList";
+import { PledgeList } from "@/components/requests/PledgeList";
 import {
   RequestStatusBadge,
   URGENCY_LABELS,
@@ -144,7 +149,19 @@ function RequestContent() {
           </Card>
         </Reveal>
 
-        <Reveal className="lg:col-span-3" delay={80}>
+        <Reveal className="space-y-6 lg:col-span-3" delay={80}>
+          <Card>
+            <CardHeader>
+              <CardTitle>Pledged donors</CardTitle>
+              <CardDescription>
+                Donors who committed to this request. Record each one when they arrive.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PledgeList requestId={record.id} onChanged={request.reload} />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Matching donors</CardTitle>
@@ -154,7 +171,9 @@ function RequestContent() {
             </CardHeader>
             <CardContent>
               {record.status === "open" ? (
-                <MatchList requestId={record.id} />
+                // Remounting when the pledge count changes refreshes the list, since a
+                // donor who pledges, or whose pledge is resolved, changes who can match.
+                <MatchList key={record.units_pledged} requestId={record.id} />
               ) : (
                 <p className="rounded-2xl bg-secondary p-4 text-sm text-ink">
                   {NOT_MATCHING[record.status]}
