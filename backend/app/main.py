@@ -7,6 +7,8 @@ Run locally from the ``backend`` directory with:
 Interactive documentation is then served at ``/api/v1/docs``.
 """
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +22,23 @@ from app.core.config import get_settings
 _VALUE_ERROR_PREFIX = "Value error, "
 
 
+def _configure_logging() -> None:
+    """Show the application's own log lines (alerts, SMS) next to the server's.
+
+    Only the ``bloodlink`` loggers are configured, at INFO, and only once, so the server's
+    and libraries' logging is left as it is. Log lines never contain tokens, passwords or
+    full phone numbers.
+    """
+    app_logger = logging.getLogger("bloodlink")
+    if app_logger.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s:     [%(name)s] %(message)s"))
+    app_logger.addHandler(handler)
+    app_logger.setLevel(logging.INFO)
+    app_logger.propagate = False
+
+
 def create_app() -> FastAPI:
     """Build and configure the FastAPI application.
 
@@ -30,6 +49,7 @@ def create_app() -> FastAPI:
     Returns:
         A fully configured ``FastAPI`` instance with CORS and all routes registered.
     """
+    _configure_logging()
     settings = get_settings()
 
     application = FastAPI(

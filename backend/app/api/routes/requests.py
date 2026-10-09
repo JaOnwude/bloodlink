@@ -1,4 +1,4 @@
-"""Blood request endpoints for hospital staff.
+"""Blood request endpoints for hospital staff, including the text-message alerts to donors.
 
 Raising a request needs a verified hospital. Reading, closing and matching are scoped to the
 signed-in staff member's own hospital: a request that belongs to another hospital is
@@ -8,12 +8,14 @@ reported as not found.
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
+from sqlmodel import Session
 
 from app.api.deps import ClientIp, SessionDep, StaffUser, VerifiedHospital
 from app.core.config import get_settings
 from app.models import Hospital
 from app.models.enums import RequestStatus
+from app.schemas.notification import AlertRunRead, AlertSummary
 from app.schemas.request import (
     MAX_SEARCH_RADIUS_KM,
     MatchesResponse,
@@ -23,6 +25,7 @@ from app.schemas.request import (
     RequestRead,
 )
 from app.services.matching import find_matches
+from app.services.notifications import alert_in_background, alert_matched_donors, count_alerts
 from app.services.requests import (
     InvalidRequestStateError,
     RequestNotFoundError,
@@ -34,6 +37,7 @@ from app.services.requests import (
     get_request,
     list_requests,
 )
+from app.services.sms import active_provider
 
 router = APIRouter(prefix="/requests", tags=["requests"])
 
@@ -60,8 +64,13 @@ def raise_request(
     hospital: VerifiedHospital,
     session: SessionDep,
     ip_address: ClientIp,
+    background_tasks: BackgroundTasks,
 ) -> RequestRead:
-    """Ask for blood on behalf of the staff member's verified hospital."""
+    """Ask for blood on behalf of the staff member's verified hospital.
+
+    Matched donors are sent a text message once the response has gone out, so the hospital
+    is not kept waiting for the SMS provider. Alerting never makes this call fail.
+    """
     try:
         request = create_request(session, staff, hospital, payload, ip_address=ip_address)
     except UnknownComponentError:
@@ -74,6 +83,7 @@ def raise_request(
             status_code=status.HTTP_409_CONFLICT,
             detail="Your hospital has too many open requests. Close some before raising more.",
         ) from None
+    background_tasks.add_task(alert_in_background, session.get_bind(), request.id)
     return build_reads(session, [request])[0]
 
 
@@ -187,4 +197,73 @@ def read_matches(
         ],
         total=total,
         radius_km=radius,
+    )
+
+
+def _alert_summary(session: Session, request_id: UUID) -> AlertSummary:
+    counts = count_alerts(session, request_id)
+    return AlertSummary(
+        sent=counts.sent,
+        failed=counts.failed,
+        queued=counts.queued,
+        total=counts.total,
+        provider=active_provider(),
+    )
+
+
+@router.get(
+    "/{request_id}/alerts",
+    response_model=AlertSummary,
+    summary="Alerts sent about a request",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "No such request"}},
+)
+def read_alerts(request_id: UUID, staff: StaffUser, session: SessionDep) -> AlertSummary:
+    """How many donors have been texted about the request, by delivery state."""
+    try:
+        get_request(session, request_id, staff.hospital_id)
+    except RequestNotFoundError:
+        raise _not_found() from None
+    return _alert_summary(session, request_id)
+
+
+@router.post(
+    "/{request_id}/alerts",
+    response_model=AlertRunRead,
+    summary="Alert matched donors",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "No such request"},
+        status.HTTP_409_CONFLICT: {"description": "Request is not open"},
+    },
+)
+def send_alerts(
+    request_id: UUID,
+    staff: StaffUser,
+    hospital: VerifiedHospital,
+    session: SessionDep,
+    radius_km: Annotated[float | None, Query(gt=0, le=MAX_SEARCH_RADIUS_KM)] = None,
+) -> AlertRunRead:
+    """Text matched donors who have not been alerted about this request yet.
+
+    Useful after widening the search radius: only the donors the wider search adds are
+    messaged. Donors already alerted are never messaged again.
+    """
+    try:
+        request = get_request(session, request_id, hospital.id)
+    except RequestNotFoundError:
+        raise _not_found() from None
+    if request.status != RequestStatus.OPEN:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Alerts can only be sent for open requests.",
+        )
+
+    run = alert_matched_donors(session, request.id, radius_km=radius_km)
+    return AlertRunRead(
+        matched=run.matched,
+        newly_alerted=run.newly_alerted,
+        sent=run.sent,
+        failed=run.failed,
+        already_alerted=run.already_alerted,
+        without_phone=run.without_phone,
+        totals=_alert_summary(session, request.id),
     )
