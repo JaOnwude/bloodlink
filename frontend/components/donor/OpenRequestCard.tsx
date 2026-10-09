@@ -15,7 +15,7 @@ import { HospitalContact } from "@/components/donor/HospitalContact";
 import { ConfirmAction } from "@/components/form/ConfirmAction";
 import { UrgencyBadge } from "@/components/requests/RequestBadges";
 import { ApiError, api } from "@/lib/api";
-import { formatDateTime, formatRelative } from "@/lib/format";
+import { formatDateTime, formatRelative, withArticle } from "@/lib/format";
 import type { OpenRequestForDonor } from "@/types/api";
 
 interface OpenRequestCardProps {
@@ -68,7 +68,7 @@ export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRe
             <UrgencyBadge urgency={request.urgency} />
           </div>
           <p className="text-sm text-ink-muted">
-            {request.component_name} for a {request.recipient_group} patient &middot;{" "}
+            {request.component_name} for {withArticle(request.recipient_group)} patient &middot;{" "}
             {units} {units === 1 ? "unit" : "units"} still needed
           </p>
           <p className="flex items-center gap-1 text-sm text-ink-muted">

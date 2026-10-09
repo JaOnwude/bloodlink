@@ -7,7 +7,7 @@
 
 import { ExternalLink, MapPin, Phone } from "lucide-react";
 
-import { mapLinkFor } from "@/lib/format";
+import { mapLinkFor, placeName } from "@/lib/format";
 import type { HospitalSummary } from "@/types/api";
 
 export function HospitalContact({ hospital }: { hospital: HospitalSummary }) {
@@ -16,7 +16,7 @@ export function HospitalContact({ hospital }: { hospital: HospitalSummary }) {
       <p className="flex items-start gap-2 text-ink">
         <MapPin className="mt-0.5 size-4 shrink-0 text-ink-muted" aria-hidden="true" />
         <span>
-          {hospital.address}, {hospital.city}, {hospital.state}
+          {hospital.address}, {placeName(hospital.city, hospital.state)}
         </span>
       </p>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-2">

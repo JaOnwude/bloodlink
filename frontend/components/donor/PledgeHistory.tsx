@@ -12,7 +12,7 @@ import { HospitalContact } from "@/components/donor/HospitalContact";
 import { ConfirmAction } from "@/components/form/ConfirmAction";
 import { PledgeStatusBadge } from "@/components/requests/RequestBadges";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, withArticle } from "@/lib/format";
 import type { DonorPledge } from "@/types/api";
 
 interface PledgeHistoryProps {
@@ -54,7 +54,7 @@ export function PledgeHistory({ pledges, total, onChanged }: PledgeHistoryProps)
               <PledgeStatusBadge status={pledge.status} />
             </div>
             <p className="text-sm text-ink-muted">
-              {pledge.request.component_name} for a {pledge.request.recipient_group} patient
+              {pledge.request.component_name} for {withArticle(pledge.request.recipient_group)} patient
             </p>
             <p className="text-sm text-ink">{outcomeText(pledge)}</p>
             {pledge.status === "pledged" ? (
