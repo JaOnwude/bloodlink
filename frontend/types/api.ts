@@ -280,3 +280,24 @@ export interface OpenRequestsForDonor {
   items: OpenRequestForDonor[];
   radius_km: number;
 }
+
+/** How many donors have been texted about a request, and through which sender. */
+export interface AlertSummary {
+  sent: number;
+  failed: number;
+  queued: number;
+  total: number;
+  /** "termii" for real messages; "console" when messages are only recorded. */
+  provider: "termii" | "console";
+}
+
+/** What one request to alert donors did, followed by the request's totals. */
+export interface AlertRun {
+  matched: number;
+  newly_alerted: number;
+  sent: number;
+  failed: number;
+  already_alerted: number;
+  without_phone: number;
+  totals: AlertSummary;
+}

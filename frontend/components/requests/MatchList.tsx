@@ -7,12 +7,16 @@
  *
  * Every donor shown is compatible with the patient, available, has agreed to be contacted
  * and is eligible to give the requested component today; the server applies those rules.
+ *
+ * Below the list, the alert panel shows how many donors have been texted and can text the
+ * donors at the chosen radius who have not been alerted yet.
  */
 
 import { MapPin, ShieldCheck, Users } from "lucide-react";
 import { useState } from "react";
 
 import { SelectField } from "@/components/form/SelectField";
+import { AlertPanel } from "@/components/requests/AlertPanel";
 import { LoadError } from "@/components/layout/LoadError";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useResource } from "@/lib/use-resource";
@@ -105,6 +109,8 @@ export function MatchList({ requestId }: { requestId: string }) {
           </ol>
         </>
       )}
+
+      <AlertPanel requestId={requestId} radiusKm={radius} />
 
       <p className="flex items-start gap-2 text-sm text-ink-muted">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-trust-600" aria-hidden="true" />
