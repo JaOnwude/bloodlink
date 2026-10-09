@@ -40,7 +40,14 @@ that spend?
 
 ## 4. Technical spike
 
-`spikes/concurrent_pledge_spike.py`. Result with lock: ____ Result without lock: ____
+`spikes/concurrent_pledge_spike.py`, run on 2026-10-09 against PostgreSQL 16: two
+transactions pledge for the last remaining unit at the same instant.
+
+- Result with the row lock (`SELECT ... FOR UPDATE`): `[accepted, rejected]`, exactly one
+  succeeds.
+- Result without the lock: `[accepted, accepted]`, the request is overbooked.
+
+This is why the pledge service locks the request row before counting pledges.
 
 ## 5. Design decisions
 
