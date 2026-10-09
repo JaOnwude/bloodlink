@@ -338,7 +338,27 @@ def test_matches_are_ranked_nearest_first_and_anonymous(
     assert body["total"] == 2
     assert body["radius_km"] == 25
     # Only these fields: no name, email, phone or exact location.
-    assert set(body["items"][0]) == {"donor_id", "blood_group", "city", "distance_km"}
+    assert set(body["items"][0]) == {
+        "donor_id",
+        "blood_group",
+        "city",
+        "distance_km",
+        "approx_latitude",
+        "approx_longitude",
+    }
+
+
+def test_match_positions_are_rounded_to_about_a_kilometre(
+    client: TestClient, db_session: Session, reference_data: None
+) -> None:
+    staff, hospital = signed_in_staff(client, db_session)
+    request = make_request_record(db_session, hospital, staff)
+    make_donor_record(db_session, email="exact@example.com", latitude=6.534567, longitude=3.384321)
+
+    [item] = client.get(f"{REQUESTS}/{request.id}/matches").json()["items"]
+
+    assert item["approx_latitude"] == 6.53
+    assert item["approx_longitude"] == 3.38
 
 
 def test_the_radius_can_be_widened_but_not_beyond_the_maximum(

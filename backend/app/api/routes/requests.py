@@ -24,7 +24,8 @@ from app.schemas.request import (
     RequestPage,
     RequestRead,
 )
-from app.services.matching import find_matches
+from app.services.distance import approximate_position
+from app.services.matching import Match, find_matches
 from app.services.notifications import alert_in_background, alert_matched_donors, count_alerts
 from app.services.requests import (
     InvalidRequestStateError,
@@ -146,6 +147,18 @@ def close_my_request(
     return build_reads(session, [request])[0]
 
 
+def _match_read(match: Match) -> MatchRead:
+    latitude, longitude = approximate_position(match.donor.latitude, match.donor.longitude)
+    return MatchRead(
+        donor_id=match.donor.id,
+        blood_group=match.donor.blood_group,
+        city=match.donor.city,
+        distance_km=round(match.distance_km, 1),
+        approx_latitude=latitude,
+        approx_longitude=longitude,
+    )
+
+
 @router.get(
     "/{request_id}/matches",
     response_model=MatchesResponse,
@@ -164,8 +177,9 @@ def read_matches(
 ) -> MatchesResponse:
     """Compatible, eligible, available donors near the hospital, nearest first.
 
-    The list is anonymous: it shows blood group, city and distance only. Contact details
-    are revealed to the hospital only after a donor pledges.
+    The list is anonymous: it shows blood group, city, distance and a position rounded to
+    about a kilometre for the map. Contact details are revealed to the hospital only after a
+    donor pledges.
     """
     try:
         request = get_request(session, request_id, staff.hospital_id)
@@ -186,15 +200,7 @@ def read_matches(
     radius = radius_km if radius_km is not None else get_settings().default_search_radius_km
     matches, total = find_matches(session, request, hospital, radius_km=radius, limit=limit)
     return MatchesResponse(
-        items=[
-            MatchRead(
-                donor_id=match.donor.id,
-                blood_group=match.donor.blood_group,
-                city=match.donor.city,
-                distance_km=round(match.distance_km, 1),
-            )
-            for match in matches
-        ],
+        items=[_match_read(match) for match in matches],
         total=total,
         radius_km=radius,
     )
