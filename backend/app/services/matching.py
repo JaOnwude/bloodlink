@@ -5,6 +5,7 @@ A donor is a match when all of these hold:
 * their blood group is compatible with the patient's, according to the
   ``blood_compatibility`` table (the rules are data, not code);
 * they are available, have agreed to be contacted, and their account is active;
+* they do not already hold a pledge waiting to be resolved;
 * they are eligible to give the requested component today, using the same rules shown on
   their own dashboard (waiting period, age, weight, deferrals);
 * they are within the search radius of the hospital.
@@ -92,6 +93,11 @@ def find_matches(
             col(Donor.is_available).is_(True),
             col(Donor.consent_to_contact).is_(True),
             col(User.is_active).is_(True),
+            # A donor with a pledge waiting to be resolved cannot pledge again, whether it is
+            # for this request or another, so offering them would only mislead.
+            col(Donor.id).not_in(
+                select(Pledge.donor_id).where(Pledge.status == PledgeStatus.PLEDGED)
+            ),
             col(Donor.latitude).between(box.min_lat, box.max_lat),
             col(Donor.longitude).between(box.min_lon, box.max_lon),
         )

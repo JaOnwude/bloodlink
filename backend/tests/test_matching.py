@@ -10,8 +10,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlmodel import Session, select
 
-from app.models import ComponentType, DonorDeferral
-from app.models.enums import BloodGroup
+from app.models import ComponentType, DonorDeferral, Pledge
+from app.models.enums import BloodGroup, PledgeStatus
 from app.services.matching import find_matches
 from tests.helpers import make_donor_record, make_request_record, make_staff_with_hospital
 
@@ -176,6 +176,24 @@ def test_deactivated_accounts_are_excluded(db_session: Session, reference_data: 
     make_donor_record(db_session, email="gone@example.com", is_active=False)
 
     assert search(db_session, request, hospital)[1] == 0
+
+
+def test_donors_with_a_pledge_waiting_to_be_resolved_are_excluded(
+    db_session: Session, reference_data: None
+) -> None:
+    staff, hospital, request = setup(db_session)
+    other = make_request_record(db_session, hospital, staff)
+    busy = make_donor_record(db_session, email="busy@example.com")
+    free = make_donor_record(db_session, email="free@example.com")
+    db_session.add(Pledge(request_id=other.id, donor_id=busy.id))
+    # A cancelled pledge no longer ties the donor up.
+    db_session.add(Pledge(request_id=other.id, donor_id=free.id, status=PledgeStatus.CANCELLED))
+    db_session.commit()
+
+    matches, total = search(db_session, request, hospital)
+
+    assert total == 1
+    assert matches[0].donor.id == free.id
 
 
 # ---------------------------------------------------------------------------------------
