@@ -49,3 +49,88 @@ export const images = {
     },
   },
 } satisfies Record<string, SiteImage>;
+
+/** One photograph in the landing page carousel, with the words shown over it. */
+export interface CarouselSlide {
+  image: SiteImage;
+  title: string;
+  body: string;
+}
+
+/**
+ * The landing page carousel: one photograph for each step of the story, from the request
+ * to the donor drive. Every picture was checked by eye against its caption. The people
+ * shown are not BloodLink users, and the page says so under the carousel.
+ */
+export const carouselSlides: CarouselSlide[] = [
+  {
+    image: {
+      src: pexels(6129154, 1600),
+      alt: "A doctor and a nurse reviewing a patient's chart in a hospital corridor beside an emergency sign.",
+      objectPosition: "50% 30%",
+      credit: {
+        author: "RDNE Stock project",
+        source: "Pexels",
+        url: "https://www.pexels.com/photo/doctor-reading-a-medical-chart-held-by-a-nurse-6129154/",
+      },
+    },
+    title: "A request in under a minute",
+    body: "Blood group, units and deadline. Matched donors are texted straight away, nearest first.",
+  },
+  {
+    image: {
+      src: pexels(12193103, 1600),
+      alt: "A donor's arm connected to a blood bag that is filling on a collection mixer.",
+      objectPosition: "50% 50%",
+      credit: {
+        author: "Frank Meriño",
+        source: "Pexels",
+        url: "https://www.pexels.com/photo/a-blood-collector-attached-on-a-person-s-hand-12193103/",
+      },
+    },
+    title: "Every pledge, tracked to a donation",
+    body: "Donors commit to one unit each. The request closes itself when it has enough.",
+  },
+  {
+    image: {
+      src: pexels(5721681, 1600),
+      alt: "A laboratory scientist looking closely through a microscope.",
+      objectPosition: "50% 35%",
+      credit: {
+        author: "cottonbro studio",
+        source: "Pexels",
+        url: "https://www.pexels.com/photo/a-woman-looking-through-a-microscope-5721681/",
+      },
+    },
+    title: "Screened before it is used",
+    body: "Eligibility is checked before anyone is texted. Your lab still screens every unit, as it always does.",
+  },
+  {
+    image: {
+      src: pexels(8248293, 1600),
+      alt: "A health worker checking the blood pressure of a smiling older woman at a community health event.",
+      objectPosition: "40% 40%",
+      credit: {
+        author: "Lagos Food Bank Initiative",
+        source: "Pexels",
+        url: "https://www.pexels.com/photo/doctor-measuring-blood-pressure-8248293/",
+      },
+    },
+    title: "Donors from the community",
+    body: "Donor drives with employers, churches, mosques and universities grow the pool before the emergency.",
+  },
+  {
+    image: {
+      src: pexels(5452224, 1600),
+      alt: "Two doctors in white coats reviewing results together at a desk.",
+      objectPosition: "50% 25%",
+      credit: {
+        author: "Tima Miroshnichenko",
+        source: "Pexels",
+        url: "https://www.pexels.com/photo/woman-in-white-button-up-long-sleeve-shirt-5452224/",
+      },
+    },
+    title: "Verified hospitals only",
+    body: "Every hospital is checked before it can contact a donor, so every alert is real.",
+  },
+];

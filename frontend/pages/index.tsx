@@ -32,14 +32,16 @@ import type { ReactNode } from "react";
 import { Container } from "@/components/layout/Container";
 import { Section } from "@/components/layout/Section";
 import { SectionHeading } from "@/components/layout/SectionHeading";
+import { PhotoCarousel } from "@/components/landing/PhotoCarousel";
 import { Pricing } from "@/components/landing/Pricing";
 import { ProductPreview } from "@/components/landing/ProductPreview";
 import { Reveal } from "@/components/motion/Reveal";
 import { buttonVariants } from "@/components/ui/button";
+import { carouselSlides } from "@/lib/images";
 import { siteConfig } from "@/lib/site";
 
 const REGISTER_HOSPITAL = "/register?as=hospital";
-const REGISTER_DONOR = "/register";
+const REGISTER_DONOR = "/register?as=donor";
 
 interface Point {
   icon: ReactNode;
@@ -204,6 +206,14 @@ export default function HomePage() {
             />
           </Reveal>
           <PointGrid points={STEPS} columns={4} />
+          <Reveal className="pt-4">
+            <PhotoCarousel slides={carouselSlides} label="BloodLink at work" />
+            <p className="mt-3 text-xs text-ink-muted">
+              Photographs from Pexels by{" "}
+              {carouselSlides.map((slide) => slide.image.credit?.author).join(", ")}. The people shown
+              are not BloodLink donors, patients or staff.
+            </p>
+          </Reveal>
         </Container>
       </Section>
 
