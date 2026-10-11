@@ -85,7 +85,9 @@ export function PhotoCarousel({ slides, label }: { slides: CarouselSlide[]; labe
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setInteracting(false);
       }}
     >
-      <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-linear-to-br from-primary-700 via-primary-900 to-night shadow-lift sm:aspect-[16/9]">
+      {/* Wide and short on larger screens, and never taller than 70% of the window, so the
+          photo and its controls always fit on one screen. */}
+      <div className="relative aspect-[4/3] max-h-[70vh] overflow-hidden rounded-3xl bg-linear-to-br from-primary-700 via-primary-900 to-night shadow-lift sm:aspect-[2/1] lg:aspect-[21/9]">
         {/* Announces each new caption to screen readers, but only while it is not playing
             by itself, so a running slideshow does not keep interrupting them. */}
         <div aria-live={playing ? "off" : "polite"}>
