@@ -64,3 +64,36 @@ export function RoleChoice({ value, onChange }: RoleChoiceProps) {
     </fieldset>
   );
 }
+
+interface RoleSummaryProps {
+  value: SelfServiceRole;
+  /** Opens the full choice, for a visitor who followed the wrong link. */
+  onChange: () => void;
+}
+
+/**
+ * The account type already chosen, shown instead of the full choice.
+ *
+ * Used when the visitor arrived from a button that already said what they are, such as
+ * "Register your hospital", so they are not asked the same question twice. A change link
+ * keeps the other option one click away.
+ */
+export function RoleSummary({ value, onChange }: RoleSummaryProps) {
+  const option = options.find((entry) => entry.value === value) ?? options[0];
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-primary-600 bg-primary-50 p-4">
+      <span className="text-primary-600">{option.icon}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-ink">{option.title}</p>
+        <p className="text-sm text-ink-muted">{option.description}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onChange}
+        className="shrink-0 rounded-md text-sm font-semibold text-primary-600 underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Change
+      </button>
+    </div>
+  );
+}

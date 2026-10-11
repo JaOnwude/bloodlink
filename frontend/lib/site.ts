@@ -41,7 +41,7 @@ export const siteConfig = {
       title: "Donors",
       links: [
         { label: "Why donate", href: "/#donors" },
-        { label: "Become a donor", href: "/register" },
+        { label: "Become a donor", href: "/register?as=donor" },
         { label: "Sign in", href: "/login" },
       ],
     },

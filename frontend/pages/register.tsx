@@ -7,8 +7,9 @@
  * any problem it finds is shown beside the field it concerns. Registering also signs the new
  * user in, after which the visitor is sent on.
  *
- * A link can preselect the account type with `?as=hospital`, as the landing page's
- * "Register your hospital" button does. Donor is the default.
+ * A link can choose the account type with `?as=hospital` or `?as=donor`, as the landing
+ * page's buttons do. The choice is then shown as a one-line summary with a change link,
+ * instead of asking the visitor again. Without it, both options are offered, donor first.
  */
 
 import { CircleAlert } from "lucide-react";
@@ -21,7 +22,7 @@ import type { FormEvent } from "react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { FormField } from "@/components/auth/FormField";
 import { PasswordField } from "@/components/auth/PasswordField";
-import { RoleChoice } from "@/components/auth/RoleChoice";
+import { RoleChoice, RoleSummary } from "@/components/auth/RoleChoice";
 import type { SelfServiceRole } from "@/components/auth/RoleChoice";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -37,12 +38,19 @@ import { useRedirectIfSignedIn } from "@/lib/use-redirect-if-signed-in";
 
 const FIELD_ORDER = ["full_name", "email", "phone", "password"];
 
-function RegisterForm({ initialRole }: { initialRole: SelfServiceRole }) {
+interface RegisterFormProps {
+  initialRole: SelfServiceRole;
+  /** True when the link already chose the account type, so the choice is not asked again. */
+  roleFromLink: boolean;
+}
+
+function RegisterForm({ initialRole, roleFromLink }: RegisterFormProps) {
   const { refresh } = useAuth();
   // Signed-in visitors are redirected by this hook once the session is confirmed.
   const requestedPath = useRedirectIfSignedIn();
 
   const [role, setRole] = useState<SelfServiceRole>(initialRole);
+  const [choosingRole, setChoosingRole] = useState(!roleFromLink);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -141,7 +149,11 @@ function RegisterForm({ initialRole }: { initialRole: SelfServiceRole }) {
             </div>
           ) : null}
 
-          <RoleChoice value={role} onChange={setRole} />
+          {choosingRole ? (
+            <RoleChoice value={role} onChange={setRole} />
+          ) : (
+            <RoleSummary value={role} onChange={() => setChoosingRole(true)} />
+          )}
 
           <FormField
             id="full_name"
@@ -209,7 +221,14 @@ export default function RegisterPage() {
   const router = useRouter();
   // The address is only readable once the router is ready, after the first render. Keying the
   // form on the role remounts it with the right choice before the visitor has typed anything.
-  const initialRole: SelfServiceRole =
-    router.isReady && router.query.as === "hospital" ? "hospital_staff" : "donor";
-  return <RegisterForm key={initialRole} initialRole={initialRole} />;
+  const requested = router.isReady ? router.query.as : undefined;
+  const roleFromLink = requested === "hospital" || requested === "donor";
+  const initialRole: SelfServiceRole = requested === "hospital" ? "hospital_staff" : "donor";
+  return (
+    <RegisterForm
+      key={`${initialRole}-${roleFromLink}`}
+      initialRole={initialRole}
+      roleFromLink={roleFromLink}
+    />
+  );
 }
