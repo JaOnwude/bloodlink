@@ -12,6 +12,7 @@ import {
   Flame,
   HeartHandshake,
   Hourglass,
+  ShieldAlert,
   Siren,
   TimerOff,
   UserX,
@@ -99,6 +100,11 @@ const pledgeStyles: Record<PledgeStatus, PillStyle> = {
     tone: "bg-primary-50 text-primary-700",
     icon: <HeartHandshake className="size-4" aria-hidden="true" />,
   },
+  standby: {
+    label: "On standby",
+    tone: "bg-secondary text-ink",
+    icon: <Hourglass className="size-4" aria-hidden="true" />,
+  },
   donated: {
     label: "Donated",
     tone: "bg-trust-50 text-trust-700",
@@ -109,10 +115,20 @@ const pledgeStyles: Record<PledgeStatus, PillStyle> = {
     tone: "bg-secondary text-ink",
     icon: <UserX className="size-4" aria-hidden="true" />,
   },
+  deferred: {
+    label: "Deferred at screening",
+    tone: "bg-secondary text-ink",
+    icon: <ShieldAlert className="size-4" aria-hidden="true" />,
+  },
   cancelled: {
     label: "Cancelled",
     tone: "bg-secondary text-ink-muted",
     icon: <CircleSlash className="size-4" aria-hidden="true" />,
+  },
+  released: {
+    label: "Not needed",
+    tone: "bg-secondary text-ink-muted",
+    icon: <CircleCheck className="size-4" aria-hidden="true" />,
   },
 };
 
