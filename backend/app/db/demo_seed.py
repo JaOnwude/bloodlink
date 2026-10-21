@@ -34,6 +34,7 @@ from app.models import BloodRequest, Donation, Donor, DonorDeferral, Hospital, P
 from app.models.base import utcnow
 from app.models.enums import (
     BloodGroup,
+    PledgeStatus,
     RequestStatus,
     RequestUrgency,
     Sex,
@@ -472,7 +473,7 @@ def seed_demo_data(
         session, lagos, lagos_staff, group="O+", units=1, urgency=RequestUrgency.ROUTINE, hours=72
     )
     donated = _pledge(session, lagos_a_pos_donors[1], routine)
-    resolve_pledge(session, lagos_staff, donated.id, donated=True, ip_address=None)
+    resolve_pledge(session, lagos_staff, donated.id, outcome=PledgeStatus.DONATED, ip_address=None)
 
     # Lagos: a request whose deadline passed before anyone pledged.
     expired = BloodRequest(
