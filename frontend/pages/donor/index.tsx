@@ -98,7 +98,10 @@ function Activity() {
     pledges.reload();
   }
 
-  const activePledge = pledges.data?.items.find((item) => item.status === "pledged") ?? null;
+  // A pledge or a standby place ties the donor to one request at a time.
+  const activePledge =
+    pledges.data?.items.find((item) => item.status === "pledged" || item.status === "standby") ??
+    null;
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
