@@ -10,6 +10,11 @@
  *   and is what staff do with the donor standing in front of them.
  * - "Did not attend" asks for confirmation first, because it frees the unit for another
  *   donor and cannot be undone.
+ * - "Deferred at screening" records that the donor came but could not give, with a reason
+ *   category that sets how long they are deferred.
+ *
+ * A freed unit goes to the next standby donor, who is texted. Standby donors are listed with
+ * their contact details, since they may be called, but have no outcome buttons until then.
  *
  * After either, the parent reloads the request so its progress and state stay current.
  */
@@ -18,6 +23,7 @@ import { Mail, Phone, UserRound, Users } from "lucide-react";
 import { useState } from "react";
 
 import { ConfirmAction } from "@/components/form/ConfirmAction";
+import { DeferralAction } from "@/components/requests/DeferralAction";
 import { LoadError } from "@/components/layout/LoadError";
 import { PledgeStatusBadge } from "@/components/requests/RequestBadges";
 import { Button } from "@/components/ui/button";
@@ -25,7 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useResource } from "@/lib/use-resource";
-import type { HospitalPledge } from "@/types/api";
+import type { DeferralReasonOption, HospitalPledge } from "@/types/api";
 
 interface PledgeListProps {
   requestId: string;
@@ -65,8 +71,16 @@ function DonatedButton({ pledgeId, onDone }: { pledgeId: string; onDone: () => v
   );
 }
 
-function PledgeRow({ pledge, onChanged }: { pledge: HospitalPledge; onChanged: () => void }) {
+interface PledgeRowProps {
+  pledge: HospitalPledge;
+  reasons: DeferralReasonOption[];
+  onChanged: () => void;
+}
+
+function PledgeRow({ pledge, reasons, onChanged }: PledgeRowProps) {
   const { donor } = pledge;
+  const deferralLabel =
+    reasons.find((option) => option.code === pledge.deferral_reason)?.label ?? null;
 
   return (
     <li className="space-y-3 px-4 py-4">
@@ -117,7 +131,7 @@ function PledgeRow({ pledge, onChanged }: { pledge: HospitalPledge; onChanged: (
           <ConfirmAction
             label="Did not attend"
             title="Record that this donor did not attend?"
-            description="The unit is released so another donor can pledge. This cannot be undone."
+            description="The unit goes to the next standby donor, who is texted, or the request reopens to other donors. This cannot be undone."
             confirmLabel="Yes, record it"
             workingLabel="Recording..."
             confirmVariant="destructive"
@@ -127,10 +141,18 @@ function PledgeRow({ pledge, onChanged }: { pledge: HospitalPledge; onChanged: (
               onChanged();
             }}
           />
+          <DeferralAction pledgeId={pledge.id} reasons={reasons} onDone={onChanged} />
         </div>
+      ) : pledge.status === "standby" ? (
+        <p className="pl-14 text-sm text-ink-muted">
+          In reserve. Called in and texted automatically if a pledged donor cannot give.
+        </p>
       ) : pledge.resolved_at ? (
         <p className="pl-14 text-sm text-ink-muted">
-          Recorded on {formatDateTime(pledge.resolved_at)}.
+          {pledge.status === "deferred" && deferralLabel ? `${deferralLabel}. ` : ""}
+          {pledge.status === "released"
+            ? `Not needed: released on ${formatDateTime(pledge.resolved_at)}.`
+            : `Recorded on ${formatDateTime(pledge.resolved_at)}.`}
         </p>
       ) : null}
     </li>
@@ -139,6 +161,8 @@ function PledgeRow({ pledge, onChanged }: { pledge: HospitalPledge; onChanged: (
 
 export function PledgeList({ requestId, onChanged }: PledgeListProps) {
   const pledges = useResource<HospitalPledge[]>(`/requests/${requestId}/pledges`);
+  // Loaded once for every row; the deferral button waits until they arrive.
+  const reasons = useResource<DeferralReasonOption[]>("/deferral-reasons");
 
   function handleChanged() {
     pledges.reload();
@@ -179,7 +203,12 @@ export function PledgeList({ requestId, onChanged }: PledgeListProps) {
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
       {pledges.data.map((pledge) => (
-        <PledgeRow key={pledge.id} pledge={pledge} onChanged={handleChanged} />
+        <PledgeRow
+          key={pledge.id}
+          pledge={pledge}
+          reasons={reasons.data ?? []}
+          onChanged={handleChanged}
+        />
       ))}
     </ul>
   );
