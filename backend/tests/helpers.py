@@ -179,6 +179,7 @@ def make_request_record(
     component_code: str = "whole_blood",
     units_needed: int = 2,
     urgency: RequestUrgency = RequestUrgency.URGENT,
+    standby_units: int = 0,
     deadline: datetime | None = None,
     status: RequestStatus = RequestStatus.OPEN,
 ) -> BloodRequest:
@@ -192,6 +193,7 @@ def make_request_record(
         recipient_group=recipient_group,
         component_type_id=component.id,
         units_needed=units_needed,
+        standby_units=standby_units,
         urgency=urgency,
         deadline=deadline or datetime.now(UTC) + timedelta(days=1),
         status=status,
