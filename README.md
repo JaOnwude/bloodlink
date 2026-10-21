@@ -54,9 +54,9 @@ they are stated here as claims, not facts.
 | Commercial blood banks work in silos, so hospitals lose time searching for blood | MIT Solve, LifeBank "Frontlines of Health" entry |
 | Postpartum haemorrhage and road traffic injuries drive constant demand | Prime Progress, feature on J Blood Match |
 
-The interviews with people who handle blood requests (section 1 of `RESEARCH.md`) are the
-evidence this product stands on. They are what the pricing and the next priorities will be
-set from.
+The interviews with people who handle blood requests (section 1 of `RESEARCH.md`) were
+deferred with the tutor's agreement and are not part of this submission. Until they are
+done, the pricing and priorities here are working assumptions, not findings.
 
 ## What it does
 
@@ -69,9 +69,14 @@ set from.
    each donor at most once per request.
 4. **Donors pledge.** Each pledge takes one unit. The pledge that takes the last unit
    fulfils the request. Donors can cancel, which frees the unit.
-5. **The hospital records each outcome:** donated or did not attend. A donation starts the
-   donor's waiting period at once.
-6. **The hospital sees its performance:** share of requests met, median time to fulfil,
+5. **Standby donors wait in reserve.** A pledge is not a unit of blood: some donors are
+   turned away at screening and some do not come. Once every unit is pledged, further
+   donors can join a standby list. If a pledged donor cancels, does not attend or is
+   deferred, the longest-waiting standby donor is called in automatically and texted.
+6. **The hospital records each outcome:** donated, did not attend, or deferred at
+   screening with a reason. A donation starts the donor's waiting period at once; a
+   deferral pauses the donor for the period that reason carries.
+7. **The hospital sees its performance:** share of requests met, median time to fulfil,
    no-show rate.
 
 Requests past their deadline expire automatically, and every sensitive action is written to
@@ -163,6 +168,25 @@ They change, and they must be reviewable by someone who does not read code.
 - donors outside the radius are excluded;
 - results are ordered nearest first.
 
+### Also hard: a standby reserve that never overbooks
+
+Standby pledges sit beside the units, never inside them: `units_needed` counts only
+pledges that hold a unit, and a request's `standby_units` caps the reserve. Joining,
+cancelling and recording an outcome all take the same row locks as pledging, so when a
+unit is freed, exactly one standby donor is promoted. A test races 12 donors for 2 units
+and 3 standby places; exactly 5 are accepted. With the row lock removed, it fails.
+
+When every unit has been given, or the request is closed or passes its deadline, the
+remaining standby donors are released ("not needed, thank you"), so nobody is tied up.
+
+**Screening outcomes protect privacy.** Staff choose a reason category (low haemoglobin,
+blood pressure, recent illness, medication, a positive infection screen, or other); each
+carries a deferral period in [`app/data/deferral_rules.py`](backend/app/data/deferral_rules.py).
+Only the category is stored, never a result. A positive infection screen defers the donor
+permanently, and the donor is only asked to contact the hospital, so the result is given
+in person, in confidence. Tests check that the words "positive" and "infection" never
+reach the donor. The periods are placeholders, to be confirmed with a blood bank.
+
 ### Also hard: alerts that are never sent twice
 
 An alert job that runs twice, or a hospital that clicks twice, must not text a donor twice
@@ -252,8 +276,8 @@ All routes are under `/api/v1`; every one is documented at
 | Hospitals | `POST /hospitals`, `GET`/`PUT /hospitals/me` |
 | Admin | `GET /admin/hospitals`, `GET /admin/hospitals/{id}`, `POST /admin/hospitals/{id}/verify`, `POST /admin/hospitals/{id}/reject` |
 | Requests | `POST`/`GET /requests`, `GET /requests/{id}`, `POST /requests/{id}/close`, `GET /requests/{id}/matches`, `GET`/`POST /requests/{id}/alerts` |
-| Pledges | `POST`/`GET /requests/{id}/pledges`, `DELETE /pledges/{id}`, `POST /pledges/{id}/donated`, `POST /pledges/{id}/no-show` |
-| Other | `GET /components`, `GET /stats/hospital`, `GET /health`, `GET /health/ready` |
+| Pledges | `POST`/`GET /requests/{id}/pledges`, `DELETE /pledges/{id}`, `POST /pledges/{id}/donated`, `POST /pledges/{id}/no-show`, `POST /pledges/{id}/deferred` |
+| Other | `GET /components`, `GET /deferral-reasons`, `GET /stats/hospital`, `GET /health`, `GET /health/ready` |
 
 Every protected route checks the caller's role and ownership. Another hospital's request,
 or another donor's pledge, is reported as not found, so its existence is never revealed.
@@ -308,7 +332,7 @@ cd backend && uv run pytest && uv run ruff check .
 cd frontend && npx tsc --noEmit && npx eslint .
 ```
 
-The backend has 316 tests. Those that need the database run against a separate
+The backend has 338 tests. Those that need the database run against a separate
 `bloodlink_test` database in the same container, so development data is never touched. If
 PostgreSQL is not running they are skipped with a message, not failed. Every test is forced
 onto the console SMS sender, so no test can send a real message.
