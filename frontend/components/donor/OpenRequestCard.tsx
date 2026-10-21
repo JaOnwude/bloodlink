@@ -5,11 +5,14 @@
  * confirmation that says so, and reminds the donor that clinical staff make the final
  * decision on the day. Once pledged, the card shows where to go and whom to call.
  *
+ * Once every unit is pledged, a request with standby places offers "Join the standby list"
+ * instead: the donor waits in reserve and is texted if a pledged donor cannot give.
+ *
  * When the server refuses (for example someone else took the last unit a moment earlier),
  * its message is shown in the confirmation panel and the list is refreshed.
  */
 
-import { HeartHandshake, MapPin } from "lucide-react";
+import { HeartHandshake, Hourglass, MapPin } from "lucide-react";
 
 import { HospitalContact } from "@/components/donor/HospitalContact";
 import { ConfirmAction } from "@/components/form/ConfirmAction";
@@ -28,7 +31,11 @@ interface OpenRequestCardProps {
 
 export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRequestCardProps) {
   const pledged = request.my_pledge_id !== null;
+  const onStandby = request.my_pledge_status === "standby";
   const units = request.units_remaining;
+  // Every unit is pledged, but the hospital still wants donors in reserve.
+  const standbyOnly = !pledged && units === 0 && request.standby_places_left > 0;
+  const places = request.standby_places_left;
 
   async function pledge() {
     try {
@@ -69,7 +76,9 @@ export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRe
           </div>
           <p className="text-sm text-ink-muted">
             {request.component_name} for {withArticle(request.recipient_group)} patient &middot;{" "}
-            {units} {units === 1 ? "unit" : "units"} still needed
+            {units > 0
+              ? `${units} ${units === 1 ? "unit" : "units"} still needed`
+              : `All units pledged · ${places} standby ${places === 1 ? "place" : "places"} left`}
           </p>
           <p className="flex items-center gap-1 text-sm text-ink-muted">
             <MapPin className="size-3.5" aria-hidden="true" />
@@ -88,7 +97,27 @@ export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRe
         </p>
       ) : null}
 
-      {pledged ? (
+      {pledged && onStandby ? (
+        <div className="space-y-4">
+          <p className="flex items-center gap-2 text-sm font-medium text-ink">
+            <Hourglass className="size-4" aria-hidden="true" />
+            You are on standby. If a pledged donor cannot give, you will be texted and asked to
+            come.
+          </p>
+          <HospitalContact hospital={request.hospital} />
+          <ConfirmAction
+            label="Step down from standby"
+            variant="ghost"
+            title="Step down from standby?"
+            description="Your standby place goes back to other donors. You can pledge to other requests straight away."
+            confirmLabel="Yes, step down"
+            workingLabel="Stepping down..."
+            confirmVariant="destructive"
+            cancelLabel="Stay on standby"
+            onConfirm={cancel}
+          />
+        </div>
+      ) : pledged ? (
         <div className="space-y-4">
           <p className="flex items-center gap-2 text-sm font-medium text-primary-700">
             <HeartHandshake className="size-4" aria-hidden="true" />
@@ -99,7 +128,7 @@ export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRe
             label="Cancel my pledge"
             variant="ghost"
             title="Cancel your pledge?"
-            description="The hospital will be told you are no longer coming, and the unit goes back to other donors."
+            description="The hospital will be told you are no longer coming, and your unit goes to a standby donor or back to other donors."
             confirmLabel="Yes, cancel it"
             workingLabel="Cancelling..."
             confirmVariant="destructive"
@@ -112,6 +141,29 @@ export function OpenRequestCard({ request, pledgedElsewhere, onChanged }: OpenRe
           You already have a pledge waiting for another request. You can pledge again once it is
           resolved or cancelled.
         </p>
+      ) : standbyOnly ? (
+        <ConfirmAction
+          label="Join the standby list"
+          variant="outline"
+          size="default"
+          title={`Join the standby list at ${request.hospital.name}?`}
+          description={
+            <div className="space-y-2">
+              <p>
+                Every unit is pledged, but some donors are turned away at screening or cannot
+                come. If that happens before {formatDateTime(request.deadline)}, you will be
+                texted and asked to come in their place.
+              </p>
+              <p>
+                Your name and phone number will be shared with the hospital. While you are on
+                standby you cannot pledge to another request; you can step down at any time.
+              </p>
+            </div>
+          }
+          confirmLabel="Join the standby list"
+          workingLabel="Joining..."
+          onConfirm={pledge}
+        />
       ) : (
         <ConfirmAction
           label="I can donate"

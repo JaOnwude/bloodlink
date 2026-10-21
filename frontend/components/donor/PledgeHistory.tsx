@@ -29,6 +29,13 @@ function outcomeText(pledge: DonorPledge): string {
       return "The hospital recorded that you did not attend.";
     case "cancelled":
       return "You cancelled this pledge.";
+    case "standby":
+      return "You are on standby. If a pledged donor cannot give, you will be texted and asked to come.";
+    case "released":
+      return "Every unit was covered, so you were not needed this time. Thank you for standing by.";
+    case "deferred":
+      // The server's message is written for the donor and never reveals the reason itself.
+      return pledge.outcome_message ?? "The hospital could not take your donation this time.";
     default:
       return `Pledged on ${formatDateTime(pledge.pledged_at)}. Go before ${formatDateTime(pledge.request.deadline)}.`;
   }
@@ -57,18 +64,23 @@ export function PledgeHistory({ pledges, total, onChanged }: PledgeHistoryProps)
               {pledge.request.component_name} for {withArticle(pledge.request.recipient_group)} patient
             </p>
             <p className="text-sm text-ink">{outcomeText(pledge)}</p>
-            {pledge.status === "pledged" ? (
+            {pledge.status === "deferred" ? <HospitalContact hospital={pledge.hospital} /> : null}
+            {pledge.status === "pledged" || pledge.status === "standby" ? (
               <>
                 <HospitalContact hospital={pledge.hospital} />
                 <ConfirmAction
-                  label="Cancel my pledge"
+                  label={pledge.status === "standby" ? "Step down from standby" : "Cancel my pledge"}
                   variant="ghost"
-                  title="Cancel your pledge?"
-                  description="The hospital will be told you are no longer coming, and the unit goes back to other donors."
-                  confirmLabel="Yes, cancel it"
+                  title={pledge.status === "standby" ? "Step down from standby?" : "Cancel your pledge?"}
+                  description={
+                    pledge.status === "standby"
+                      ? "Your standby place goes back to other donors."
+                      : "The hospital will be told you are no longer coming, and your unit goes to a standby donor or back to other donors."
+                  }
+                  confirmLabel={pledge.status === "standby" ? "Yes, step down" : "Yes, cancel it"}
                   workingLabel="Cancelling..."
                   confirmVariant="destructive"
-                  cancelLabel="Keep my pledge"
+                  cancelLabel={pledge.status === "standby" ? "Stay on standby" : "Keep my pledge"}
                   onConfirm={async () => {
                     await api.delete(`/pledges/${pledge.id}`);
                     onChanged();

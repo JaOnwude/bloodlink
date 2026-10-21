@@ -149,6 +149,9 @@ export interface BloodRequest {
   units_needed: number;
   units_pledged: number;
   units_remaining: number;
+  /** Extra donors accepted in reserve once every unit is pledged. */
+  standby_units: number;
+  standby_pledged: number;
   urgency: RequestUrgency;
   deadline: string;
   notes: string | null;
@@ -187,7 +190,30 @@ export interface MatchesResponse {
 }
 
 /** Where a donor's commitment to a request stands. */
-export type PledgeStatus = "pledged" | "donated" | "no_show" | "cancelled";
+export type PledgeStatus =
+  | "pledged"
+  | "standby"
+  | "donated"
+  | "no_show"
+  | "deferred"
+  | "cancelled"
+  | "released";
+
+/** Why a donor was turned away at screening. Only the category is ever recorded. */
+export type DeferralReason =
+  | "low_haemoglobin"
+  | "blood_pressure"
+  | "recent_illness"
+  | "medication"
+  | "positive_screen"
+  | "other";
+
+/** A screening outcome staff can choose, with how long it defers the donor (null: permanently). */
+export interface DeferralReasonOption {
+  code: DeferralReason;
+  label: string;
+  deferral_days: number | null;
+}
 
 /** A pledge after a change, with the effect on its request. */
 export interface PledgeResult {
@@ -198,6 +224,7 @@ export interface PledgeResult {
   resolved_at: string | null;
   request_status: RequestStatus;
   units_remaining: number;
+  standby_places_left: number;
 }
 
 /**
@@ -219,6 +246,8 @@ export interface HospitalPledge {
   status: PledgeStatus;
   pledged_at: string;
   resolved_at: string | null;
+  /** Set for a deferred pledge; seen only by the hospital that recorded it. */
+  deferral_reason: DeferralReason | null;
   donor: PledgedDonor;
 }
 
@@ -251,6 +280,8 @@ export interface DonorPledge {
   status: PledgeStatus;
   pledged_at: string;
   resolved_at: string | null;
+  /** For a deferral, what the donor is told. Never the reason itself. */
+  outcome_message: string | null;
   request: DonorRequestSummary;
   hospital: HospitalSummary;
 }
@@ -272,10 +303,14 @@ export interface OpenRequestForDonor {
   urgency: RequestUrgency;
   deadline: string;
   notes: string | null;
+  /** Units still free. Zero when only standby places are left. */
   units_remaining: number;
+  standby_places_left: number;
   distance_km: number;
   hospital: HospitalSummary;
   my_pledge_id: string | null;
+  /** Whether the donor's pledge takes a unit or waits in reserve. */
+  my_pledge_status: "pledged" | "standby" | null;
 }
 
 /** The open requests a donor can answer, and the radius searched. */

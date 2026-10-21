@@ -118,6 +118,19 @@ the remaining item."
   motion.
 - Product ideas and clinical research: see [`docs/product-ideas.md`](product-ideas.md).
 
+### Day 7: standby donors and screening outcomes (21 October)
+- **Standby list:** once every unit is pledged, donors can wait in reserve. A freed unit
+  (cancelled, did not attend, deferred) goes automatically to the longest-waiting standby
+  donor, who is texted. The rest are released when the request is met, closed or expired.
+- **Deferred at screening:** staff pick a reason; the donor is paused for that reason's
+  period. A positive infection screen is permanent and never revealed to the donor in the
+  app.
+- Pledge states are now: pledged, standby, donated, no-show, deferred, cancelled, released.
+
+*Stand-up line:* "A pledge isn't a unit of blood, so BloodLink now keeps a standby reserve
+that fills a gap automatically, still without overbooking, and records why a donor was
+turned away without ever exposing a test result."
+
 ---
 
 ## 4. Architecture
@@ -220,7 +233,7 @@ pledges.
 
 ## 7. Tests: where the proof is
 
-316 backend tests run against a real PostgreSQL database.
+338 backend tests run against a real PostgreSQL database.
 
 | Proves | File |
 |---|---|
@@ -230,6 +243,7 @@ pledges.
 | Distances, bounding box, ordering | `tests/test_distance.py` |
 | Alerts at most once, even concurrently | `tests/test_notifications.py` |
 | Pledge lifecycle, privacy, ownership | `tests/test_pledges_api.py` |
+| Standby reserve under concurrency, promotion, release, deferral privacy | `tests/test_standby_and_screening.py` |
 | Hospital figures | `tests/test_stats_api.py` |
 | Demo data is complete and safe | `tests/test_demo_seed.py` |
 

@@ -12,6 +12,9 @@ from app.schemas.common import blank_to_none
 # Limits on what a request may ask for. They protect donors from alert floods and keep a
 # request meaningful: a deadline far in the future is not an urgent need.
 MAX_UNITS_PER_REQUEST = 20
+# Most extra donors a request can hold in reserve. Enough to cover the donors screening
+# turns away, without tying up donors who will not be needed.
+MAX_STANDBY_UNITS = 10
 MAX_DEADLINE_DAYS = 30
 MIN_DEADLINE_MINUTES = 5
 MAX_NOTES_LENGTH = 1000
@@ -39,6 +42,9 @@ class RequestCreate(BaseModel):
             from the compatibility table.
         component_code: What is needed, such as ``whole_blood`` or ``platelets``.
         units_needed: How many units are still required.
+        standby_units: How many extra donors to accept in reserve once every unit is
+            pledged. Some donors are turned away at screening or do not come; a standby donor
+            is then called in their place. Zero turns standby off.
         urgency: How quickly the blood is needed.
         deadline: When the need ends. Must carry a time zone, so it means the same moment
             everywhere, and lie between five minutes and thirty days from now.
@@ -48,6 +54,7 @@ class RequestCreate(BaseModel):
     recipient_group: BloodGroup
     component_code: str = Field(default="whole_blood", min_length=1, max_length=50)
     units_needed: int = Field(ge=1, le=MAX_UNITS_PER_REQUEST)
+    standby_units: int = Field(default=0, ge=0, le=MAX_STANDBY_UNITS)
     urgency: RequestUrgency
     deadline: datetime
     notes: _Notes = None
@@ -74,6 +81,7 @@ class RequestRead(BaseModel):
 
     ``units_pledged`` counts donors who have committed or have already given;
     ``units_remaining`` is what is still needed.
+    ``standby_pledged`` counts donors waiting in reserve, out of ``standby_units`` places.
     """
 
     id: UUID
@@ -84,6 +92,8 @@ class RequestRead(BaseModel):
     units_needed: int
     units_pledged: int
     units_remaining: int
+    standby_units: int
+    standby_pledged: int
     urgency: RequestUrgency
     deadline: datetime
     notes: str | None

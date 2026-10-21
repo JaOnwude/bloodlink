@@ -5,7 +5,7 @@ A donor is a match when all of these hold:
 * their blood group is compatible with the patient's, according to the
   ``blood_compatibility`` table (the rules are data, not code);
 * they are available, have agreed to be contacted, and their account is active;
-* they do not already hold a pledge waiting to be resolved;
+* they do not already hold a pledge waiting to be resolved, or a standby place;
 * they are eligible to give the requested component today, using the same rules shown on
   their own dashboard (waiting period, age, weight, deferrals);
 * they are within the search radius of the hospital.
@@ -93,10 +93,15 @@ def find_matches(
             col(Donor.is_available).is_(True),
             col(Donor.consent_to_contact).is_(True),
             col(User.is_active).is_(True),
-            # A donor with a pledge waiting to be resolved cannot pledge again, whether it is
-            # for this request or another, so offering them would only mislead.
+            # A donor with a pledge waiting to be resolved, or on standby, cannot pledge again,
+            # whether for this request or another, so offering them would only mislead.
             col(Donor.id).not_in(
-                select(Pledge.donor_id).where(Pledge.status == PledgeStatus.PLEDGED)
+                select(Pledge.donor_id)
+                .join(BloodRequest, col(BloodRequest.id) == col(Pledge.request_id))
+                .where(
+                    col(Pledge.status).in_((PledgeStatus.PLEDGED, PledgeStatus.STANDBY)),
+                    col(BloodRequest.status).in_((RequestStatus.OPEN, RequestStatus.FULFILLED)),
+                )
             ),
             col(Donor.latitude).between(box.min_lat, box.max_lat),
             col(Donor.longitude).between(box.min_lon, box.max_lon),
@@ -142,13 +147,19 @@ def find_matches(
 
 @dataclass(frozen=True)
 class RequestForDonor:
-    """An open request a donor can answer, with where it is and how far away."""
+    """A request a donor can answer, with where it is and how far away.
+
+    Attributes:
+        units_remaining: Units still free. Zero when only standby places are left.
+        standby_places_left: Standby places still free once every unit is pledged.
+    """
 
     request: BloodRequest
     hospital: Hospital
     component: ComponentType
     distance_km: float
     units_remaining: int
+    standby_places_left: int
 
 
 # Most urgent first; within the same urgency, the soonest deadline first.
@@ -162,17 +173,18 @@ def find_requests_for_donor(
     radius_km: float,
     today: date | None = None,
 ) -> list[RequestForDonor]:
-    """Return the open requests a donor can answer: matching seen from the donor's side.
+    """Return the requests a donor can answer: matching seen from the donor's side.
 
     A request is included when the donor's group can be given to its patient (from the
-    ``blood_compatibility`` table), its deadline is still ahead, it still needs units, its
+    ``blood_compatibility`` table), its deadline is still ahead, it still needs units or
+    has standby places left, its
     hospital is within ``radius_km`` of the donor, and the donor is eligible today for the
     component it asks for. Availability and contact consent are not required here: they
     govern whether the donor is alerted, while a donor who looks for requests themselves
     is free to answer one.
 
-    Requests the donor has already pledged to are included as long as they are open, so the
-    donor can see and cancel the pledge from the same list.
+    Requests the donor has already pledged to, or is on standby for, are included while
+    they are live, so the donor can see and cancel the pledge from the same list.
 
     Results are ordered by urgency, then deadline, then distance.
     """
@@ -190,7 +202,7 @@ def find_requests_for_donor(
         .join(Hospital, col(Hospital.id) == col(BloodRequest.hospital_id))
         .join(ComponentType, col(ComponentType.id) == col(BloodRequest.component_type_id))
         .where(
-            BloodRequest.status == RequestStatus.OPEN,
+            col(BloodRequest.status).in_((RequestStatus.OPEN, RequestStatus.FULFILLED)),
             col(BloodRequest.deadline) > datetime.now(UTC),
             col(BloodRequest.recipient_group).in_(recipient_groups),
             col(Hospital.latitude).between(box.min_lat, box.max_lat),
@@ -200,14 +212,35 @@ def find_requests_for_donor(
     if not rows:
         return []
 
+    request_ids = [request.id for request, _, _ in rows]
     taken = dict(
         session.exec(
             select(Pledge.request_id, func.count())
             .where(
-                col(Pledge.request_id).in_([request.id for request, _, _ in rows]),
+                col(Pledge.request_id).in_(request_ids),
                 col(Pledge.status).in_((PledgeStatus.PLEDGED, PledgeStatus.DONATED)),
             )
             .group_by(Pledge.request_id)
+        ).all()
+    )
+    on_standby = dict(
+        session.exec(
+            select(Pledge.request_id, func.count())
+            .where(
+                col(Pledge.request_id).in_(request_ids),
+                Pledge.status == PledgeStatus.STANDBY,
+            )
+            .group_by(Pledge.request_id)
+        ).all()
+    )
+    # Requests the donor is already committed to stay in the list, even if now full.
+    mine = set(
+        session.exec(
+            select(Pledge.request_id).where(
+                col(Pledge.request_id).in_(request_ids),
+                Pledge.donor_id == donor.id,
+                col(Pledge.status).in_((PledgeStatus.PLEDGED, PledgeStatus.STANDBY)),
+            )
         ).all()
     )
 
@@ -223,8 +256,9 @@ def find_requests_for_donor(
         )
         if distance > radius_km:
             continue
-        remaining = request.units_needed - taken.get(request.id, 0)
-        if remaining <= 0:
+        remaining = max(request.units_needed - taken.get(request.id, 0), 0)
+        standby_left = max(request.standby_units - on_standby.get(request.id, 0), 0)
+        if remaining <= 0 and standby_left <= 0 and request.id not in mine:
             continue
         if component.id not in eligible_for:
             result = evaluate_eligibility(
@@ -246,6 +280,7 @@ def find_requests_for_donor(
                 component=component,
                 distance_km=distance,
                 units_remaining=remaining,
+                standby_places_left=standby_left,
             )
         )
 

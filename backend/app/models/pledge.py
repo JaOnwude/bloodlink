@@ -7,7 +7,7 @@ from sqlalchemy import DateTime, Index, UniqueConstraint
 from sqlmodel import Field
 
 from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin, enum_column_type, utcnow
-from app.models.enums import PledgeStatus
+from app.models.enums import DeferralReason, PledgeStatus
 
 
 class Pledge(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
@@ -28,6 +28,8 @@ class Pledge(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
         pledged_at: When the donor accepted.
         resolved_at: When staff recorded the outcome (donated or no-show).
         resolved_by: The staff member who recorded the outcome.
+        deferral_reason: Why the donor was turned away at screening, for a deferred pledge.
+            Seen only by the hospital that recorded it.
     """
 
     __tablename__ = "pledges"
@@ -47,3 +49,8 @@ class Pledge(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
     pledged_at: datetime = Field(default_factory=utcnow, sa_type=DateTime(timezone=True))
     resolved_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))
     resolved_by: UUID | None = Field(default=None, foreign_key="users.id", ondelete="SET NULL")
+    deferral_reason: DeferralReason | None = Field(
+        default=None,
+        sa_type=enum_column_type(DeferralReason, "deferral_reason"),
+        nullable=True,
+    )

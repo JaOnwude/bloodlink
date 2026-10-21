@@ -2,6 +2,9 @@
 
 No feature work is accepted until this document is complete and signed off.
 
+> **Status (21 October 2026):** with the tutor's agreement, the user interviews and market
+> research move to the next project. The sections below are left as the template.
+
 ## 1. User evidence
 
 ### Conversation 1

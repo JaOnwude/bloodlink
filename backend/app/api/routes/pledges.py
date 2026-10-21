@@ -1,20 +1,29 @@
 """Pledge endpoints: donors committing to requests, and staff recording the outcome.
 
-Donors pledge and cancel. Hospital staff list the pledges for their own requests and
-record whether each donor gave blood. Pledges for another hospital's request, or another
-donor's pledge, are reported as not found, so their existence is never revealed.
+Donors pledge, join a standby reserve, or cancel. Hospital staff list the pledges for their
+own requests and record what happened: donated, did not attend, or deferred at screening.
+Pledges for another hospital's request, or another donor's pledge, are reported as not
+found, so their existence is never revealed.
 """
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from sqlmodel import Session
 
 from app.api.deps import ClientIp, DonorUser, SessionDep, StaffUser
+from app.data.deferral_rules import DEFERRAL_RULES
 from app.models import Donor
-from app.models.enums import PledgeStatus
-from app.schemas.pledge import HospitalPledgeRead, PledgedDonor, PledgeRead
+from app.models.enums import DeferralReason, PledgeStatus
+from app.schemas.pledge import (
+    DeferralCreate,
+    DeferralReasonRead,
+    HospitalPledgeRead,
+    PledgedDonor,
+    PledgeRead,
+)
 from app.services.donors import get_donor_for_user
+from app.services.notifications import notify_promoted_in_background
 from app.services.pledges import (
     ActivePledgeError,
     AlreadyPledgedError,
@@ -25,6 +34,7 @@ from app.services.pledges import (
     RequestFullError,
     RequestNotOpenError,
     cancel_pledge,
+    count_standby,
     count_taken_units,
     create_pledge,
     list_request_pledges,
@@ -36,6 +46,10 @@ router = APIRouter(tags=["pledges"])
 
 _REQUEST_NOT_FOUND = "Request not found."
 _PLEDGE_NOT_FOUND = "Pledge not found."
+
+# Once a donor withdraws or is released from standby, their contact details are no longer
+# shared with the hospital.
+_CONTACT_WITHHELD = (PledgeStatus.CANCELLED, PledgeStatus.RELEASED)
 
 
 def _not_found(detail: str) -> HTTPException:
@@ -58,6 +72,7 @@ def _require_donor_profile(session: Session, user: DonorUser) -> Donor:
 
 def _pledge_read(session: Session, outcome: PledgeOutcome) -> PledgeRead:
     taken = count_taken_units(session, outcome.request.id)
+    waiting = count_standby(session, outcome.request.id)
     return PledgeRead(
         id=outcome.pledge.id,
         request_id=outcome.request.id,
@@ -66,7 +81,18 @@ def _pledge_read(session: Session, outcome: PledgeOutcome) -> PledgeRead:
         resolved_at=outcome.pledge.resolved_at,
         request_status=outcome.request.status,
         units_remaining=max(outcome.request.units_needed - taken, 0),
+        standby_places_left=max(outcome.request.standby_units - waiting, 0),
     )
+
+
+def _tell_promoted(
+    background_tasks: BackgroundTasks, session: Session, outcome: PledgeOutcome
+) -> None:
+    """Text the standby donor who was moved up, once the response has gone out."""
+    if outcome.promoted is not None:
+        background_tasks.add_task(
+            notify_promoted_in_background, session.get_bind(), outcome.promoted.id
+        )
 
 
 @router.post(
@@ -85,11 +111,12 @@ def _pledge_read(session: Session, outcome: PledgeOutcome) -> PledgeRead:
 def pledge_to_request(
     request_id: UUID, user: DonorUser, session: SessionDep, ip_address: ClientIp
 ) -> PledgeRead:
-    """Commit the signed-in donor to a request.
+    """Commit the signed-in donor to a request, or join its standby reserve.
 
     Safe under concurrency: when several donors pledge for the last unit at the same
-    instant, exactly one succeeds and the others receive 409. The pledge that takes the
-    last unit moves the request to ``fulfilled``.
+    instant, exactly one succeeds. The pledge that takes the last unit moves the request to
+    ``fulfilled``. After that, donors join the standby reserve (status ``standby``) while
+    places are left, and anyone after them receives 409.
     """
     donor = _require_donor_profile(session, user)
     try:
@@ -114,8 +141,9 @@ def read_request_pledges(
 ) -> list[HospitalPledgeRead]:
     """List who has pledged to the request, oldest first, with their contact details.
 
-    Contact details are shown because the donor shared them by pledging. They are left out
-    for cancelled pledges.
+    Contact details are shown because the donor shared them by pledging, including donors
+    on standby, who may be called. They are left out once a donor cancels or is released
+    from standby.
     """
     try:
         views = list_request_pledges(session, request_id, staff.hospital_id)
@@ -124,13 +152,14 @@ def read_request_pledges(
 
     items: list[HospitalPledgeRead] = []
     for view in views:
-        share = view.pledge.status != PledgeStatus.CANCELLED
+        share = view.pledge.status not in _CONTACT_WITHHELD
         items.append(
             HospitalPledgeRead(
                 id=view.pledge.id,
                 status=view.pledge.status,
                 pledged_at=view.pledge.pledged_at,
                 resolved_at=view.pledge.resolved_at,
+                deferral_reason=view.pledge.deferral_reason,
                 donor=PledgedDonor(
                     donor_id=view.donor.id,
                     blood_group=view.donor.blood_group,
@@ -154,11 +183,16 @@ def read_request_pledges(
     },
 )
 def cancel_my_pledge(
-    pledge_id: UUID, user: DonorUser, session: SessionDep, ip_address: ClientIp
+    pledge_id: UUID,
+    user: DonorUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    background_tasks: BackgroundTasks,
 ) -> PledgeRead:
-    """Withdraw one of the signed-in donor's pledges.
+    """Withdraw one of the signed-in donor's pledges, or step down from standby.
 
-    The unit is freed, and a fulfilled request whose deadline is still ahead reopens.
+    A cancelled pledge frees its unit: the longest-waiting standby donor is called in and
+    texted, or, with nobody on standby, a fulfilled request whose deadline is ahead reopens.
     """
     donor = _require_donor_profile(session, user)
     try:
@@ -167,19 +201,35 @@ def cancel_my_pledge(
         raise _not_found(_PLEDGE_NOT_FOUND) from None
     except InvalidPledgeStateError as exc:
         raise _conflict(exc) from None
+    _tell_promoted(background_tasks, session, outcome)
     return _pledge_read(session, outcome)
 
 
 def _resolve(
-    pledge_id: UUID, staff: StaffUser, session: Session, ip_address: str | None, *, donated: bool
+    pledge_id: UUID,
+    staff: StaffUser,
+    session: Session,
+    ip_address: str | None,
+    background_tasks: BackgroundTasks,
+    *,
+    outcome: PledgeStatus,
+    reason: DeferralReason | None = None,
 ) -> PledgeRead:
     try:
-        outcome = resolve_pledge(session, staff, pledge_id, donated=donated, ip_address=ip_address)
+        result = resolve_pledge(
+            session,
+            staff,
+            pledge_id,
+            outcome=outcome,
+            deferral_reason=reason,
+            ip_address=ip_address,
+        )
     except PledgeNotFoundError:
         raise _not_found(_PLEDGE_NOT_FOUND) from None
     except InvalidPledgeStateError as exc:
         raise _conflict(exc) from None
-    return _pledge_read(session, outcome)
+    _tell_promoted(background_tasks, session, result)
+    return _pledge_read(session, result)
 
 
 @router.post(
@@ -192,14 +242,21 @@ def _resolve(
     },
 )
 def confirm_donation(
-    pledge_id: UUID, staff: StaffUser, session: SessionDep, ip_address: ClientIp
+    pledge_id: UUID,
+    staff: StaffUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    background_tasks: BackgroundTasks,
 ) -> PledgeRead:
     """Record that the donor gave blood.
 
     Creates the donation record and updates the donor's last donation date in the same
-    transaction, so their waiting period starts immediately.
+    transaction, so their waiting period starts immediately. Once every unit the request
+    needs has been given, any standby donors are released.
     """
-    return _resolve(pledge_id, staff, session, ip_address, donated=True)
+    return _resolve(
+        pledge_id, staff, session, ip_address, background_tasks, outcome=PledgeStatus.DONATED
+    )
 
 
 @router.post(
@@ -212,7 +269,65 @@ def confirm_donation(
     },
 )
 def record_no_show(
-    pledge_id: UUID, staff: StaffUser, session: SessionDep, ip_address: ClientIp
+    pledge_id: UUID,
+    staff: StaffUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    background_tasks: BackgroundTasks,
 ) -> PledgeRead:
-    """Record that the donor did not come. The unit is freed for another donor."""
-    return _resolve(pledge_id, staff, session, ip_address, donated=False)
+    """Record that the donor did not come. The unit goes to the next standby donor."""
+    return _resolve(
+        pledge_id, staff, session, ip_address, background_tasks, outcome=PledgeStatus.NO_SHOW
+    )
+
+
+@router.post(
+    "/pledges/{pledge_id}/deferred",
+    response_model=PledgeRead,
+    summary="Record a deferral at screening",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "No such pledge"},
+        status.HTTP_409_CONFLICT: {
+            "description": "Pledge already resolved, cancelled or on standby"
+        },
+    },
+)
+def record_deferral(
+    pledge_id: UUID,
+    payload: DeferralCreate,
+    staff: StaffUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    background_tasks: BackgroundTasks,
+) -> PledgeRead:
+    """Record that the donor came but was turned away at screening.
+
+    The donor is deferred for the period set for the reason, permanently for a positive
+    infection screen. Only the reason category is stored, never a result. The unit goes to
+    the next standby donor, who is texted.
+    """
+    return _resolve(
+        pledge_id,
+        staff,
+        session,
+        ip_address,
+        background_tasks,
+        outcome=PledgeStatus.DEFERRED,
+        reason=payload.reason,
+    )
+
+
+@router.get(
+    "/deferral-reasons",
+    response_model=list[DeferralReasonRead],
+    summary="Reasons a donor can be deferred at screening",
+)
+def list_deferral_reasons(staff: StaffUser) -> list[DeferralReasonRead]:
+    """The screening outcomes staff can record, with how long each defers the donor.
+
+    Read from ``app.data.deferral_rules``, so the form always matches the rules in force.
+    """
+    return [
+        DeferralReasonRead(code=reason, label=rule.staff_label, deferral_days=rule.days)
+        for reason, rule in DEFERRAL_RULES.items()
+    ]

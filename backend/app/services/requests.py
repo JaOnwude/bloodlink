@@ -35,6 +35,10 @@ MAX_OPEN_REQUESTS_PER_HOSPITAL = 25
 # Pledge states that use up one of the units a request asks for.
 COUNTED_PLEDGE_STATES = (PledgeStatus.PLEDGED, PledgeStatus.DONATED)
 
+# Pledge states that tie a donor to a request they have not yet given for: a donor holding
+# one cannot commit to another request at the same time.
+ACTIVE_PLEDGE_STATES = (PledgeStatus.PLEDGED, PledgeStatus.STANDBY)
+
 
 class RequestNotFoundError(Exception):
     """The request does not exist, or belongs to another hospital."""
@@ -63,10 +67,48 @@ def _snapshot(request: BloodRequest) -> dict[str, Any]:
     }
 
 
+def release_standby(
+    session: Session, request_ids: Sequence[UUID], *, actor: User | None = None
+) -> int:
+    """Release the standby donors of requests that can no longer call on them.
+
+    Used when a request is closed, expires, or has every unit confirmed as donated: standby
+    donors were waiting in case they were needed, and must now be free to answer other
+    requests. Each release is written to the audit log; the caller commits.
+
+    Returns:
+        The number of standby pledges released.
+    """
+    if not request_ids:
+        return 0
+    waiting = session.exec(
+        select(Pledge).where(
+            col(Pledge.request_id).in_(request_ids),
+            Pledge.status == PledgeStatus.STANDBY,
+        )
+    ).all()
+    for pledge in waiting:
+        pledge.status = PledgeStatus.RELEASED
+        pledge.resolved_at = utcnow()
+        session.add(pledge)
+        record_audit(
+            session,
+            actor=actor,
+            action="pledge.released",
+            entity_type="pledge",
+            entity_id=pledge.id,
+            before={"status": PledgeStatus.STANDBY.value},
+            after={"status": PledgeStatus.RELEASED.value},
+        )
+    return len(waiting)
+
+
 def expire_overdue(
     session: Session, *, hospital_id: UUID | None = None, now: datetime | None = None
 ) -> int:
     """Move open requests whose deadline has passed to ``expired``.
+
+    Standby donors waiting on any request whose deadline has passed are released.
 
     Args:
         hospital_id: Only this hospital's requests, or every hospital's when None.
@@ -100,7 +142,19 @@ def expire_overdue(
             before=before,
             after=_snapshot(request),
         )
-    if overdue:
+
+    # Fulfilled requests keep their state when the deadline passes, but nobody can be called
+    # for them any more, so their standby donors are released too.
+    past_fulfilled_query = select(BloodRequest.id).where(
+        BloodRequest.status == RequestStatus.FULFILLED,
+        col(BloodRequest.deadline) <= moment,
+    )
+    if hospital_id is not None:
+        past_fulfilled_query = past_fulfilled_query.where(BloodRequest.hospital_id == hospital_id)
+    finished = [request.id for request in overdue] + list(session.exec(past_fulfilled_query).all())
+    released = release_standby(session, finished)
+
+    if overdue or released:
         session.commit()
     return len(overdue)
 
@@ -147,6 +201,7 @@ def create_request(
         recipient_group=data.recipient_group,
         component_type_id=component.id,
         units_needed=data.units_needed,
+        standby_units=data.standby_units,
         urgency=data.urgency,
         deadline=data.deadline,
         notes=data.notes,
@@ -224,6 +279,8 @@ def close_request(
 ) -> BloodRequest:
     """Close a request, for example because the need has passed.
 
+    Any standby donors still waiting on it are released.
+
     Raises:
         RequestNotFoundError: If it does not exist or is not this hospital's.
         InvalidRequestStateError: If it is already closed or has expired.
@@ -240,6 +297,7 @@ def close_request(
     before = _snapshot(locked)
     locked.status = RequestStatus.CLOSED
     session.add(locked)
+    release_standby(session, [locked.id], actor=staff)
     record_audit(
         session,
         actor=staff,
@@ -258,7 +316,8 @@ def close_request(
 def build_reads(session: Session, requests: Sequence[BloodRequest]) -> list[RequestRead]:
     """Turn requests into their API form, adding component names and pledge counts.
 
-    Names and counts are fetched for the whole list in two queries, not one per request.
+    Names and counts are fetched for the whole list in a fixed number of queries, not one
+    per request.
     """
     if not requests:
         return []
@@ -270,12 +329,23 @@ def build_reads(session: Session, requests: Sequence[BloodRequest]) -> list[Requ
             select(ComponentType).where(col(ComponentType.id).in_(component_ids))
         ).all()
     }
+    request_ids = [request.id for request in requests]
     pledged = dict(
         session.exec(
             select(Pledge.request_id, func.count())
             .where(
-                col(Pledge.request_id).in_([request.id for request in requests]),
+                col(Pledge.request_id).in_(request_ids),
                 col(Pledge.status).in_(COUNTED_PLEDGE_STATES),
+            )
+            .group_by(Pledge.request_id)
+        ).all()
+    )
+    on_standby = dict(
+        session.exec(
+            select(Pledge.request_id, func.count())
+            .where(
+                col(Pledge.request_id).in_(request_ids),
+                Pledge.status == PledgeStatus.STANDBY,
             )
             .group_by(Pledge.request_id)
         ).all()
@@ -295,6 +365,8 @@ def build_reads(session: Session, requests: Sequence[BloodRequest]) -> list[Requ
                 units_needed=request.units_needed,
                 units_pledged=units_pledged,
                 units_remaining=max(request.units_needed - units_pledged, 0),
+                standby_units=request.standby_units,
+                standby_pledged=on_standby.get(request.id, 0),
                 urgency=request.urgency,
                 deadline=request.deadline,
                 notes=request.notes,

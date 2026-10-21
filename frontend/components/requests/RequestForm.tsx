@@ -36,6 +36,7 @@ import type { BloodComponent, BloodGroup, BloodRequest, RequestUrgency } from "@
 
 // The same limits the server applies.
 const MAX_UNITS = 20;
+const MAX_STANDBY = 10;
 const MIN_DEADLINE_MINUTES = 5;
 const MAX_DEADLINE_DAYS = 30;
 const MAX_NOTES_LENGTH = 1000;
@@ -44,6 +45,7 @@ const FIELD_ORDER = [
   "recipient_group",
   "component_code",
   "units_needed",
+  "standby_units",
   "urgency",
   "deadline",
   "notes",
@@ -62,6 +64,9 @@ interface FormState {
   recipientGroup: BloodGroup | "";
   componentCode: string;
   units: string;
+  /** Standby places, kept in step with the units until staff type their own number. */
+  standby: string;
+  standbyEdited: boolean;
   urgency: RequestUrgency | "";
   /** Local date and time in the "YYYY-MM-DDTHH:mm" form of a datetime-local input. */
   deadline: string;
@@ -72,10 +77,23 @@ const EMPTY_FORM: FormState = {
   recipientGroup: "",
   componentCode: "whole_blood",
   units: "1",
+  standby: "1",
+  standbyEdited: false,
   urgency: "",
   deadline: "",
   notes: "",
 };
+
+/**
+ * The suggested number of standby donors for a number of units: about half, rounded up,
+ * because roughly one donor in six or seven is turned away at screening, and some do not
+ * come. Staff can always change it.
+ */
+function suggestedStandby(units: string): string {
+  const count = Number(units);
+  if (!Number.isInteger(count) || count < 1) return "1";
+  return String(Math.min(Math.ceil(count / 2), MAX_STANDBY));
+}
 
 function hoursFromNow(hours: number): Date {
   return new Date(Date.now() + hours * 3_600_000);
@@ -93,6 +111,11 @@ function validate(form: FormState): FieldErrors {
   const units = Number(form.units);
   if (!Number.isInteger(units) || units < 1 || units > MAX_UNITS) {
     problems.units_needed = `Enter a whole number of units from 1 to ${MAX_UNITS}.`;
+  }
+
+  const standby = Number(form.standby);
+  if (!Number.isInteger(standby) || standby < 0 || standby > MAX_STANDBY) {
+    problems.standby_units = `Enter a whole number of standby donors from 0 to ${MAX_STANDBY}.`;
   }
 
   if (!form.urgency) problems.urgency = "Choose how urgent this is.";
@@ -166,6 +189,7 @@ export function RequestForm() {
         recipient_group: form.recipientGroup,
         component_code: form.componentCode,
         units_needed: Number(form.units),
+        standby_units: Number(form.standby),
         urgency: form.urgency,
         // The input holds local time; toISOString gives the same instant in UTC.
         deadline: new Date(form.deadline).toISOString(),
@@ -258,8 +282,37 @@ export function RequestForm() {
           step={1}
           hint={`One donor gives one unit. Up to ${MAX_UNITS} per request.`}
           value={form.units}
-          onChange={(event) => update("units", event.target.value)}
+          onChange={(event) => {
+            const units = event.target.value;
+            setForm((current) => ({
+              ...current,
+              units,
+              // Follow the units until staff choose their own number of standby donors.
+              standby: current.standbyEdited ? current.standby : suggestedStandby(units),
+            }));
+          }}
           error={errors.units_needed}
+        />
+
+        <FormField
+          id="standby_units"
+          name="standby_units"
+          label="Standby donors"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={MAX_STANDBY}
+          step={1}
+          hint="Extra donors held in reserve once every unit is pledged. Some donors are turned away at screening or do not come; a standby donor is then called in and texted automatically. Use 0 for none."
+          value={form.standby}
+          onChange={(event) =>
+            setForm((current) => ({
+              ...current,
+              standby: event.target.value,
+              standbyEdited: true,
+            }))
+          }
+          error={errors.standby_units}
         />
       </section>
 
