@@ -33,9 +33,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import Session, col, select
 
 from app.core.config import get_settings
-from app.models import BloodRequest, ComponentType, Donor, Hospital, Notification, User
+from app.models import BloodRequest, ComponentType, Donor, Hospital, Notification, Pledge, User
 from app.models.base import utcnow
-from app.models.enums import NotificationChannel, NotificationStatus, RequestStatus
+from app.models.enums import NotificationChannel, NotificationStatus, PledgeStatus, RequestStatus
 from app.services.matching import find_matches
 from app.services.sms import SmsSender, get_sms_sender
 
@@ -239,3 +239,44 @@ def count_alerts(session: Session, request_id: UUID) -> AlertCounts:
         failed=statuses[NotificationStatus.FAILED],
         queued=statuses[NotificationStatus.QUEUED],
     )
+
+
+def compose_promotion(request: BloodRequest, hospital: Hospital, component: ComponentType) -> str:
+    """The text a standby donor receives when they are called in to give."""
+    deadline = request.deadline.astimezone(WAT).strftime("%d %b %H:%M")
+    link = f"{get_settings().frontend_url.rstrip('/')}/donor"
+    return (
+        f"BloodLink: you are now needed. {hospital.name} ({hospital.city}) is counting on you "
+        f"to give {component.name.lower()} by {deadline} WAT. Details: {link}"
+    )
+
+
+def notify_promoted_in_background(engine: Engine, pledge_id: UUID) -> None:
+    """Tell a standby donor they have been moved up to fill a unit, after the response.
+
+    Sent once, at the moment of promotion, which happens under the request's row lock, so
+    the same promotion cannot produce two messages. The notification log is not used: its
+    one-alert-per-request rule is for the first alert, and this donor may already have had
+    it. Any error is logged and swallowed, as for other alerts.
+    """
+    try:
+        with Session(engine) as session:
+            pledge = session.get(Pledge, pledge_id)
+            if pledge is None or pledge.status != PledgeStatus.PLEDGED:
+                return
+            request = session.get(BloodRequest, pledge.request_id)
+            donor = session.get(Donor, pledge.donor_id)
+            if request is None or donor is None:
+                return
+            hospital = session.get(Hospital, request.hospital_id)
+            component = session.get(ComponentType, request.component_type_id)
+            user = session.get(User, donor.user_id)
+            if hospital is None or component is None or user is None or not user.phone:
+                return
+            result = get_sms_sender().send(
+                user.phone, compose_promotion(request, hospital, component)
+            )
+            if not result.ok:
+                logger.warning("Promotion message for pledge %s failed", pledge_id)
+    except Exception:
+        logger.exception("Telling the promoted donor for pledge %s failed", pledge_id)
