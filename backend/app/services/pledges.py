@@ -4,7 +4,15 @@ A pledge moves through these states:
 
     pledged -> donated      (staff confirm the donation took place)
     pledged -> no_show      (staff record that the donor did not come)
+    pledged -> deferred     (the donor came but was turned away at screening)
     pledged -> cancelled    (the donor withdraws; they may pledge again later)
+    standby -> pledged      (a pledged donor could not give, so this one is called in)
+    standby -> released     (the request was met or ended; the donor is not needed)
+    standby -> cancelled    (the donor steps down from standby)
+
+A pledge is not a unit of blood: some donors are turned away at screening and some do not
+come. A request can therefore hold standby donors in reserve once every unit is pledged,
+and the longest-waiting one is promoted automatically when a unit is freed.
 
 The central guarantee is that a request is never promised more units than it needs, even
 when several donors accept at the same instant. Every operation that changes how many
@@ -23,7 +31,7 @@ Every change is written to the audit log in the same transaction.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -31,6 +39,7 @@ from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from app.core.config import get_settings
+from app.data.deferral_rules import DEFERRAL_RULES
 from app.models import (
     BloodCompatibility,
     BloodRequest,
@@ -43,10 +52,16 @@ from app.models import (
     User,
 )
 from app.models.base import utcnow
-from app.models.enums import PledgeStatus, RequestStatus
+from app.models.enums import DeferralReason, PledgeStatus, RequestStatus
 from app.services.audit import record_audit
 from app.services.eligibility import evaluate_eligibility
-from app.services.requests import COUNTED_PLEDGE_STATES, RequestNotFoundError, expire_overdue
+from app.services.requests import (
+    ACTIVE_PLEDGE_STATES,
+    COUNTED_PLEDGE_STATES,
+    RequestNotFoundError,
+    expire_overdue,
+    release_standby,
+)
 
 
 class PledgeNotFoundError(Exception):
@@ -79,10 +94,20 @@ class InvalidPledgeStateError(Exception):
 
 @dataclass(frozen=True)
 class PledgeOutcome:
-    """A pledge together with the request it belongs to, after a change."""
+    """A pledge together with the request it belongs to, after a change.
+
+    Attributes:
+        promoted: A standby donor who was moved up to fill a unit this change freed, so
+            the caller can tell them they are now needed.
+    """
 
     pledge: Pledge
     request: BloodRequest
+    promoted: Pledge | None = None
+
+
+# States a donor can pledge again from on the same row: they withdrew, or were not needed.
+_REUSABLE_STATES = (PledgeStatus.CANCELLED, PledgeStatus.RELEASED)
 
 
 def _pledge_snapshot(pledge: Pledge) -> dict[str, Any]:
@@ -137,6 +162,64 @@ def count_taken_units(session: Session, request_id: UUID) -> int:
             col(Pledge.status).in_(COUNTED_PLEDGE_STATES),
         )
     ).one()
+
+
+def count_standby(session: Session, request_id: UUID) -> int:
+    """Number of donors waiting in reserve for the request."""
+    return session.exec(
+        select(func.count())
+        .select_from(Pledge)
+        .where(Pledge.request_id == request_id, Pledge.status == PledgeStatus.STANDBY)
+    ).one()
+
+
+def _fill_freed_unit(
+    session: Session, request: BloodRequest, *, actor: User | None
+) -> Pledge | None:
+    """Fill a unit that has just been freed, from standby first.
+
+    Called after a pledged donor cancels, does not come, or is deferred at screening. The
+    longest-waiting standby donor is promoted to pledged, so the request stays covered
+    without a new search. Only when nobody is on standby does a fulfilled request reopen to
+    new donors. Nothing happens once the deadline has passed or the request has ended.
+
+    Must be called with the request row locked, after the freeing change has been added to
+    the session.
+
+    Returns:
+        The promoted pledge, so the caller can tell that donor they are now needed.
+    """
+    if request.status not in (RequestStatus.OPEN, RequestStatus.FULFILLED):
+        return None
+    if request.deadline <= utcnow():
+        return None
+    session.flush()
+    if count_taken_units(session, request.id) >= request.units_needed:
+        return None
+
+    waiting = session.exec(
+        select(Pledge)
+        .where(Pledge.request_id == request.id, Pledge.status == PledgeStatus.STANDBY)
+        .order_by(col(Pledge.pledged_at), col(Pledge.id))
+        .with_for_update()
+    ).first()
+    if waiting is not None:
+        before = _pledge_snapshot(waiting)
+        waiting.status = PledgeStatus.PLEDGED
+        session.add(waiting)
+        record_audit(
+            session,
+            actor=actor,
+            action="pledge.promoted",
+            entity_type="pledge",
+            entity_id=waiting.id,
+            before=before,
+            after=_pledge_snapshot(waiting),
+        )
+        return waiting
+
+    _reopen_if_short(session, request, actor=actor)
+    return None
 
 
 def _reopen_if_short(session: Session, request: BloodRequest, *, actor: User | None) -> None:
@@ -227,22 +310,27 @@ def create_pledge(
 
     1. lock the donor's row, so the same donor cannot pledge to two requests at once;
     2. lock the request row, so competing pledges for it take turns;
-    3. check the request is open and not past its deadline, and that the donor may answer
-       it (compatible group, eligible today, no other active pledge, not already pledged);
-    4. count the units already taken; refuse if none are left;
+    3. check the request is still live (open, or fulfilled with standby places) and before
+       its deadline, and that the donor may answer it (compatible group, eligible today, no
+       other active pledge, not already pledged);
+    4. count the units already taken. While some are free, the donor takes one; once all
+       are taken, they join the standby reserve if places are left; otherwise refuse;
     5. record the pledge, and mark the request fulfilled if it took the last unit.
 
-    A donor who cancelled earlier pledges again on the same row, which the unique
-    constraint on (request, donor) requires.
+    A standby pledge never counts against ``units_needed``: the guarantee that a request
+    is never promised more units than it needs is unchanged.
+
+    A donor who cancelled earlier, or was released from standby, pledges again on the same
+    row, which the unique constraint on (request, donor) requires.
 
     Raises:
         RequestNotFoundError: If there is no such request.
-        RequestNotOpenError: If the request is not open, or its deadline has just passed.
+        RequestNotOpenError: If the request has ended, or its deadline has just passed.
         NotEligibleError: If the donor's group is incompatible or they may not give today.
         AlreadyPledgedError: If the donor already pledged to this request.
         ActivePledgeError: If the donor has an unresolved pledge for another request.
-        RequestFullError: If every unit is already taken, including when the request
-            has just been fulfilled by a competing pledge.
+        RequestFullError: If every unit and every standby place is taken, including when
+            a competing pledge has just taken the last one.
     """
     on_day = today or datetime.now(UTC).date()
 
@@ -261,11 +349,13 @@ def create_pledge(
         session.rollback()
         expire_overdue(session, hospital_id=request.hospital_id)
         raise RequestNotOpenError("This request has expired.")
-    if request.status == RequestStatus.FULFILLED:
+    if request.status == RequestStatus.FULFILLED and (
+        request.standby_units == 0 or request.deadline <= utcnow()
+    ):
         # Usually the outcome of losing a race for the last unit, so say exactly that.
         session.rollback()
         raise RequestFullError("Every unit this request needs has already been pledged.")
-    if request.status != RequestStatus.OPEN:
+    if request.status not in (RequestStatus.OPEN, RequestStatus.FULFILLED):
         status = request.status.value
         session.rollback()
         raise RequestNotOpenError(f"This request is {status} and no longer takes pledges.")
@@ -276,14 +366,18 @@ def create_pledge(
         existing = session.exec(
             select(Pledge).where(Pledge.request_id == request.id, Pledge.donor_id == donor.id)
         ).first()
-        if existing is not None and existing.status != PledgeStatus.CANCELLED:
+        if existing is not None and existing.status not in _REUSABLE_STATES:
             raise AlreadyPledgedError("You have already pledged to this request.")
 
         elsewhere = session.exec(
-            select(Pledge.id).where(
+            select(Pledge.id)
+            .join(BloodRequest, col(BloodRequest.id) == col(Pledge.request_id))
+            .where(
                 Pledge.donor_id == donor.id,
-                Pledge.status == PledgeStatus.PLEDGED,
+                col(Pledge.status).in_(ACTIVE_PLEDGE_STATES),
                 Pledge.request_id != request.id,
+                # A pledge on a request that has ended no longer ties the donor up.
+                col(BloodRequest.status).in_((RequestStatus.OPEN, RequestStatus.FULFILLED)),
             )
         ).first()
         if elsewhere is not None:
@@ -292,8 +386,16 @@ def create_pledge(
                 "until the hospital records your donation, before pledging again."
             )
 
-        if count_taken_units(session, request.id) >= request.units_needed:
-            raise RequestFullError("Every unit this request needs has already been pledged.")
+        if count_taken_units(session, request.id) < request.units_needed:
+            new_status = PledgeStatus.PLEDGED
+        elif count_standby(session, request.id) < request.standby_units:
+            new_status = PledgeStatus.STANDBY
+        else:
+            raise RequestFullError(
+                "Every unit this request needs has already been pledged."
+                if request.standby_units == 0
+                else "Every unit and every standby place for this request is taken."
+            )
     except Exception:
         session.rollback()
         raise
@@ -301,12 +403,13 @@ def create_pledge(
     if existing is not None:
         pledge = existing
         before = _pledge_snapshot(pledge)
-        pledge.status = PledgeStatus.PLEDGED
+        pledge.status = new_status
         pledge.pledged_at = utcnow()
         pledge.resolved_at = None
         pledge.resolved_by = None
+        pledge.deferral_reason = None
     else:
-        pledge = Pledge(request_id=request.id, donor_id=donor.id)
+        pledge = Pledge(request_id=request.id, donor_id=donor.id, status=new_status)
         before = None
     session.add(pledge)
     session.flush()
@@ -321,7 +424,9 @@ def create_pledge(
         ip_address=ip_address,
     )
 
-    if count_taken_units(session, request.id) >= request.units_needed:
+    if request.status == RequestStatus.OPEN and (
+        count_taken_units(session, request.id) >= request.units_needed
+    ):
         request_before = _request_snapshot(request)
         request.status = RequestStatus.FULFILLED
         request.fulfilled_at = utcnow()
@@ -368,10 +473,11 @@ def _lock_pledge_with_request(
 def cancel_pledge(
     session: Session, user: User, donor: Donor, pledge_id: UUID, *, ip_address: str | None
 ) -> PledgeOutcome:
-    """Withdraw one of the donor's own pledges.
+    """Withdraw one of the donor's own pledges, or step down from standby.
 
-    The unit is freed. If the request had been fulfilled and its deadline is still ahead,
-    it reopens so another donor can take the unit.
+    Cancelling a pledge frees its unit: the longest-waiting standby donor takes it, or, with
+    nobody on standby, a fulfilled request whose deadline is still ahead reopens. Stepping
+    down from standby frees only the standby place.
 
     Raises:
         PledgeNotFoundError: If there is no such pledge, or it belongs to another donor.
@@ -383,11 +489,12 @@ def cancel_pledge(
         raise PledgeNotFoundError(str(pledge_id))
     pledge, request = locked
 
-    if pledge.status != PledgeStatus.PLEDGED:
+    if pledge.status not in ACTIVE_PLEDGE_STATES:
         status = pledge.status.value.replace("_", " ")
         session.rollback()
         raise InvalidPledgeStateError(f"This pledge is already {status}.")
 
+    took_a_unit = pledge.status == PledgeStatus.PLEDGED
     before = _pledge_snapshot(pledge)
     pledge.status = PledgeStatus.CANCELLED
     session.add(pledge)
@@ -401,12 +508,16 @@ def cancel_pledge(
         after=_pledge_snapshot(pledge),
         ip_address=ip_address,
     )
-    _reopen_if_short(session, request, actor=None)
+    promoted = _fill_freed_unit(session, request, actor=None) if took_a_unit else None
 
     session.commit()
     session.refresh(pledge)
     session.refresh(request)
-    return PledgeOutcome(pledge=pledge, request=request)
+    return PledgeOutcome(pledge=pledge, request=request, promoted=promoted)
+
+
+#: The outcomes staff can record for a pledged donor.
+OUTCOMES = (PledgeStatus.DONATED, PledgeStatus.NO_SHOW, PledgeStatus.DEFERRED)
 
 
 def resolve_pledge(
@@ -414,23 +525,42 @@ def resolve_pledge(
     staff: User,
     pledge_id: UUID,
     *,
-    donated: bool,
+    outcome: PledgeStatus,
+    deferral_reason: DeferralReason | None = None,
     ip_address: str | None,
 ) -> PledgeOutcome:
-    """Record whether a donor who pledged actually gave blood.
+    """Record what happened when a pledged donor was due to give.
 
-    When they donated, a ``donations`` row is created and the donor's cached
-    ``last_donation_date`` is moved forward, all in this transaction, so the waiting
-    period starts at once and matching stops offering the donor. When they did not come,
-    the unit is freed and a fulfilled request whose deadline is still ahead reopens.
+    - **Donated:** a ``donations`` row is created and the donor's cached
+      ``last_donation_date`` is moved forward, all in this transaction, so the waiting
+      period starts at once and matching stops offering the donor. Once every unit the
+      request needs has been given, any standby donors are released.
+    - **Did not attend:** the unit is freed.
+    - **Deferred at screening:** the donor came but could not give. A deferral is recorded
+      for the period set for the reason in ``app.data.deferral_rules`` (permanent for a
+      positive infection screen), and the unit is freed.
+
+    A freed unit goes to the longest-waiting standby donor; with nobody on standby, a
+    fulfilled request whose deadline is still ahead reopens.
 
     An outcome can be recorded whatever state the request is now in: a donor may arrive
     just before a request is closed, and the record of what happened should still be kept.
 
+    Args:
+        outcome: One of ``OUTCOMES``.
+        deferral_reason: Required when the outcome is deferred, ignored otherwise.
+
     Raises:
         PledgeNotFoundError: If there is no such pledge, or it is for another hospital.
-        InvalidPledgeStateError: If the pledge is not active (already resolved or cancelled).
+        InvalidPledgeStateError: If the pledge is not waiting for an outcome (already
+            resolved, cancelled, or still on standby).
+        ValueError: If the outcome is not one of ``OUTCOMES``, or a deferral has no reason.
     """
+    if outcome not in OUTCOMES:
+        raise ValueError(f"{outcome} is not an outcome staff can record.")
+    if outcome == PledgeStatus.DEFERRED and deferral_reason is None:
+        raise ValueError("A deferral needs a reason.")
+
     locked = _lock_pledge_with_request(session, pledge_id)
     if locked is None or staff.hospital_id is None or locked[1].hospital_id != staff.hospital_id:
         session.rollback()
@@ -440,14 +570,31 @@ def resolve_pledge(
     if pledge.status != PledgeStatus.PLEDGED:
         status = pledge.status.value.replace("_", " ")
         session.rollback()
+        if pledge.status == PledgeStatus.STANDBY:
+            raise InvalidPledgeStateError("This donor is on standby and has not been called yet.")
         raise InvalidPledgeStateError(f"This pledge is already {status}.")
 
     now = utcnow()
+    donated = outcome == PledgeStatus.DONATED
     before = _pledge_snapshot(pledge)
-    pledge.status = PledgeStatus.DONATED if donated else PledgeStatus.NO_SHOW
+    pledge.status = outcome
     pledge.resolved_at = now
     pledge.resolved_by = staff.id
+    pledge.deferral_reason = deferral_reason if outcome == PledgeStatus.DEFERRED else None
     session.add(pledge)
+
+    if outcome == PledgeStatus.DEFERRED and deferral_reason is not None:
+        rule = DEFERRAL_RULES[deferral_reason]
+        session.add(
+            DonorDeferral(
+                donor_id=pledge.donor_id,
+                reason=rule.label,
+                deferred_until=(
+                    now.date() + timedelta(days=rule.days) if rule.days is not None else None
+                ),
+                recorded_by=staff.id,
+            )
+        )
 
     if donated:
         session.add(
@@ -472,20 +619,32 @@ def resolve_pledge(
     record_audit(
         session,
         actor=staff,
-        action="pledge.donated" if donated else "pledge.no_show",
+        action=f"pledge.{outcome.value}",
         entity_type="pledge",
         entity_id=pledge.id,
         before=before,
         after=_pledge_snapshot(pledge),
         ip_address=ip_address,
     )
-    if not donated:
-        _reopen_if_short(session, request, actor=None)
+
+    promoted = None
+    if donated:
+        session.flush()
+        given = session.exec(
+            select(func.count())
+            .select_from(Pledge)
+            .where(Pledge.request_id == request.id, Pledge.status == PledgeStatus.DONATED)
+        ).one()
+        # Every unit has actually been given, so nobody in reserve can be needed any more.
+        if given >= request.units_needed:
+            release_standby(session, [request.id], actor=staff)
+    else:
+        promoted = _fill_freed_unit(session, request, actor=None)
 
     session.commit()
     session.refresh(pledge)
     session.refresh(request)
-    return PledgeOutcome(pledge=pledge, request=request)
+    return PledgeOutcome(pledge=pledge, request=request, promoted=promoted)
 
 
 @dataclass(frozen=True)
