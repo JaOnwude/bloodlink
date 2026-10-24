@@ -14,6 +14,7 @@ from app.services.postcode import (
     lookup_postcode,
     normalise_postcode,
     parse_postcode,
+    shared_ring,
 )
 
 BASE = "https://api.postcode.example"
@@ -274,3 +275,35 @@ def test_mock_answers_are_never_stored(db_session: Session) -> None:
     lookup_postcode(db_session, MockPostcodeClient(), "FC-01-A01-KP-27", 3)
 
     assert find_stored_lookup(db_session, "mock", "FC-01-A01-KP-27") is None
+
+
+# ---------------------------------------------------------------------------------------
+# Postcode rings between a hospital and a donor
+# ---------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("donor_area", "ring"),
+    [
+        ("FC-01-A01-KP", "area"),
+        ("FC-01-A01-LR", "district"),
+        ("FC-01-B02-KP", "lga"),
+        ("FC-02-A01-KP", "state"),
+        ("LA-01-A01-KP", None),
+        (None, None),
+    ],
+)
+def test_the_closest_shared_ring_is_found(donor_area: str | None, ring: str | None) -> None:
+    assert shared_ring("FC-01-A01-KP-27", donor_area) == ring
+
+
+def test_a_hospital_without_a_postcode_shares_no_ring() -> None:
+    assert shared_ring(None, "FC-01-A01-KP") is None
+
+
+def test_the_mock_never_answers_above_the_granted_level() -> None:
+    result = MockPostcodeClient(max_level=1).lookup("FC-01-A01-KP-27", 3)
+
+    assert result.level == 1
+    assert result.administrative_address is None
+    assert result.building_use_status is None

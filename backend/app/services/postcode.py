@@ -125,6 +125,32 @@ def normalise_postcode(raw: str) -> str | None:
     return segments.postcode if segments else None
 
 
+# How closely two postcodes agree, from the closest to the widest. A donor in the same area
+# as a hospital is on its doorstep; one in the same state may be hours away.
+POSTCODE_RINGS = ("area", "district", "lga", "state")
+
+
+def shared_ring(hospital_postcode: str | None, donor_area: str | None) -> str | None:
+    """The closest postcode ring a hospital and a donor share, or None if they share none.
+
+    Compares the hospital's building postcode with the donor's area code segment by segment:
+    the same state, LGA, district and area means ``"area"``; the same state, LGA and
+    district means ``"district"``; and so on. Either side missing a postcode shares nothing.
+    """
+    if not hospital_postcode or not donor_area:
+        return None
+    hospital = hospital_postcode.split("-")[:4]
+    donor = donor_area.split("-")[:4]
+    shared = 0
+    for ours, theirs in zip(hospital, donor, strict=False):
+        if ours != theirs:
+            break
+        shared += 1
+    if shared == 0:
+        return None
+    return POSTCODE_RINGS[len(POSTCODE_RINGS) - shared]
+
+
 @dataclass(frozen=True)
 class AdministrativeAddress:
     """The places a postcode belongs to, as NIPOST names them (level 2 and up)."""
@@ -313,15 +339,20 @@ class MockPostcodeClient:
     Args:
         reference: A NIPOST client used for the free reference data, when a key is
             available. Without one, the names of the sample state's LGAs are built in.
+        max_level: Highest lookup level to answer at, as NIPOST would cap it, so the mock
+            never shows more detail than the organisation has been granted. Raise it in the
+            settings to rehearse what a higher level will add.
     """
 
     name = "mock"
 
-    def __init__(self, reference: NipostClient | None = None) -> None:
+    def __init__(self, reference: NipostClient | None = None, max_level: int = 5) -> None:
         self._reference = reference
+        self._max_level = max_level
         self._buildings = {building.postcode: building for building in SAMPLE_BUILDINGS}
 
     def lookup(self, postcode: str, level: int) -> LookupResult:
+        level = max(1, min(level, self._max_level))
         building = self._buildings.get(postcode)
         if building is None:
             return LookupResult(postcode=postcode, valid=False, level=level)
@@ -378,7 +409,7 @@ def get_postcode_client(settings: Settings | None = None) -> PostcodeClient:
         if config.nipost_api_key:
             is_live = config.nipost_api_key.startswith("nipost_live_")
             reference = _nipost_client(config, "live" if is_live else "test")
-        return MockPostcodeClient(reference=reference)
+        return MockPostcodeClient(reference=reference, max_level=config.nipost_max_lookup_level)
 
     if config.nipost_key_matches_mode:
         return _nipost_client(config, config.postcode_mode)
@@ -389,7 +420,7 @@ def get_postcode_client(settings: Settings | None = None) -> PostcodeClient:
         config.postcode_mode,
         config.postcode_mode,
     )
-    return MockPostcodeClient()
+    return MockPostcodeClient(max_level=config.nipost_max_lookup_level)
 
 
 def find_stored_lookup(session: Session, source: str, postcode: str) -> PostcodeLookup | None:
