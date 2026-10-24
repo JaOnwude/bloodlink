@@ -10,7 +10,11 @@ A donor is a match when all of these hold:
   their own dashboard (waiting period, age, weight, deferrals);
 * they are within the search radius of the hospital.
 
-Matches are ordered nearest first.
+Matches are ordered in postcode rings, then nearest first. A donor whose postcode area is
+the hospital's own comes first, then the same district, the same LGA and the same state, and
+last the donors with no postcode to compare. Within each ring the nearest donor comes first.
+Because alerts go to the first donors in this order, the people on the hospital's own
+streets hear first, and the search widens ring by ring as the list goes on.
 
 The same rules also run in the other direction, from a donor to the open requests they can
 answer, so what a donor is offered and what a hospital sees always agree.
@@ -37,14 +41,23 @@ from app.models import (
 from app.models.enums import PledgeStatus, RequestStatus, RequestUrgency
 from app.services.distance import bounding_box, haversine_km
 from app.services.eligibility import evaluate_eligibility
+from app.services.postcode import POSTCODE_RINGS, shared_ring
 
 
 @dataclass(frozen=True)
 class Match:
-    """A donor who can answer a request, and how far away they are."""
+    """A donor who can answer a request, and how close they are.
+
+    Attributes:
+        donor: The matching donor.
+        distance_km: Straight-line distance from the hospital.
+        postcode_ring: The closest postcode ring the donor shares with the hospital
+            (``area``, ``district``, ``lga`` or ``state``), or None.
+    """
 
     donor: Donor
     distance_km: float
+    postcode_ring: str | None = None
 
 
 def find_matches(
@@ -138,11 +151,23 @@ def find_matches(
             min_weight_kg=settings.min_donor_weight_kg,
         )
         if result.components[0].eligible:
-            matches.append(Match(donor=donor, distance_km=distance))
+            ring = shared_ring(hospital.postcode, donor.postcode_area)
+            matches.append(Match(donor=donor, distance_km=distance, postcode_ring=ring))
 
-    # Nearest first; the id breaks ties so the order is stable between calls.
-    matches.sort(key=lambda match: (match.distance_km, str(match.donor.id)))
+    # Closest postcode ring first, then nearest; the id breaks ties so the order is stable.
+    matches.sort(
+        key=lambda match: (
+            _ring_rank(match.postcode_ring),
+            match.distance_km,
+            str(match.donor.id),
+        )
+    )
     return matches[:limit], len(matches)
+
+
+def _ring_rank(ring: str | None) -> int:
+    """Sort position of a postcode ring: the hospital's own area first, no postcode last."""
+    return POSTCODE_RINGS.index(ring) if ring is not None else len(POSTCODE_RINGS)
 
 
 @dataclass(frozen=True)

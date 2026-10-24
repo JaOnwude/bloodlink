@@ -121,6 +121,8 @@ class MatchRead(BaseModel):
         approx_latitude: The donor's latitude snapped to a grid of about a kilometre, for
             the map. Donors in the same square share a position.
         approx_longitude: The longitude, snapped the same way.
+        postcode_ring: The closest postcode ring the donor shares with the hospital:
+            ``area``, ``district``, ``lga`` or ``state``. Empty when either has no postcode.
     """
 
     donor_id: UUID
@@ -129,10 +131,11 @@ class MatchRead(BaseModel):
     distance_km: float
     approx_latitude: float
     approx_longitude: float
+    postcode_ring: str | None = None
 
 
 class MatchesResponse(BaseModel):
-    """The donors matching a request, nearest first."""
+    """The donors matching a request, closest postcode ring first, then nearest."""
 
     items: list[MatchRead]
     total: int

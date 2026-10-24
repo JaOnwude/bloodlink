@@ -337,7 +337,8 @@ def test_matches_are_ranked_nearest_first_and_anonymous(
     assert [item["city"] for item in body["items"]] == ["Near", "Far"]
     assert body["total"] == 2
     assert body["radius_km"] == 25
-    # Only these fields: no name, email, phone or exact location.
+    # Only these fields: no name, email, phone, exact location or postcode area. The ring
+    # says only how close the donor's area is to the hospital's ("area", "lga", ...).
     assert set(body["items"][0]) == {
         "donor_id",
         "blood_group",
@@ -345,6 +346,7 @@ def test_matches_are_ranked_nearest_first_and_anonymous(
         "distance_km",
         "approx_latitude",
         "approx_longitude",
+        "postcode_ring",
     }
 
 

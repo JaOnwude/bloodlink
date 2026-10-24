@@ -156,6 +156,7 @@ def _match_read(match: Match) -> MatchRead:
         distance_km=round(match.distance_km, 1),
         approx_latitude=latitude,
         approx_longitude=longitude,
+        postcode_ring=match.postcode_ring,
     )
 
 

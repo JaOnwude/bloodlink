@@ -335,3 +335,34 @@ def test_each_component_uses_its_own_waiting_period(
 
     assert search(db_session, whole_request, hospital)[1] == 0
     assert search(db_session, platelet_request, hospital)[1] == 1
+
+
+# ---------------------------------------------------------------------------------------
+# Postcode rings
+# ---------------------------------------------------------------------------------------
+
+
+def test_donors_in_the_hospital_s_postcode_area_come_before_nearer_donors_without_one(
+    db_session: Session, reference_data: None
+) -> None:
+    _, hospital, request = setup(db_session)
+    hospital.postcode = "LA-01-A01-KP-27"
+    db_session.add(hospital)
+    db_session.commit()
+
+    near_without_postcode = make_donor_record(db_session, email="near@example.com")
+    same_lga = make_donor_record(db_session, email="lga@example.com", latitude=6.5544)
+    same_area = make_donor_record(db_session, email="area@example.com", latitude=6.5844)
+    same_lga.postcode_area = "LA-01-B02-MM"
+    same_area.postcode_area = "LA-01-A01-KP"
+    db_session.add_all([same_lga, same_area])
+    db_session.commit()
+
+    matches, _ = search(db_session, request, hospital)
+
+    assert [match.donor.id for match in matches] == [
+        same_area.id,
+        same_lga.id,
+        near_without_postcode.id,
+    ]
+    assert [match.postcode_ring for match in matches] == ["area", "lga", None]
