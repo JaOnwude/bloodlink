@@ -40,6 +40,7 @@ def _snapshot(hospital: Hospital) -> dict[str, Any]:
         "state": hospital.state,
         "latitude": hospital.latitude,
         "longitude": hospital.longitude,
+        "postcode": hospital.postcode,
         "registration_number": hospital.registration_number,
         "contact_phone": hospital.contact_phone,
         "verification_status": hospital.verification_status.value,

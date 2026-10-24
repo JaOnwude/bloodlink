@@ -14,7 +14,7 @@ from pydantic import (
 )
 
 from app.models.enums import VerificationStatus
-from app.schemas.common import RequiredPhone, blank_to_none
+from app.schemas.common import OptionalPostcode, RequiredPhone, blank_to_none
 
 _Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
 _Address = Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=500)]
@@ -49,6 +49,8 @@ class HospitalWrite(BaseModel):
         state: State or equivalent region.
         latitude: Facility latitude, the origin for donor searches.
         longitude: Facility longitude.
+        postcode: The facility's NIPOST building postcode, if known. It must be one NIPOST
+            has assigned.
         registration_number: Regulator-issued registration or licence number, if any.
         contact_phone: Number of the switchboard or blood bank desk.
     """
@@ -59,6 +61,7 @@ class HospitalWrite(BaseModel):
     state: _Place
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    postcode: OptionalPostcode = None
     registration_number: _RegistrationNumber = None
     contact_phone: RequiredPhone
 
@@ -78,6 +81,7 @@ class HospitalRead(BaseModel):
     state: str
     latitude: float
     longitude: float
+    postcode: str | None
     registration_number: str | None
     contact_phone: str
     verification_status: VerificationStatus
