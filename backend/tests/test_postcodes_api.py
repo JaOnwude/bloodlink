@@ -8,10 +8,19 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from app.api.routes.postcodes import postcode_client
+from app.core.config import get_settings
 from app.main import app
 from app.models import Donor, Hospital
 from app.services.postcode import PostcodeServiceError
-from tests.helpers import API, donor_payload, hospital_payload, register_user
+from tests.helpers import (
+    API,
+    donor_payload,
+    hospital_payload,
+    make_admin,
+    make_staff_with_hospital,
+    register_user,
+    sign_in,
+)
 
 CHECK = f"{API}/postcodes/check"
 AT = f"{API}/postcodes/at"
@@ -201,3 +210,64 @@ def test_a_hospital_postcode_of_the_wrong_shape_is_refused(client: TestClient) -
     response = client.post(HOSPITALS, json=hospital_payload(postcode="FC-01"))
 
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------------------
+# An administrator's look at a hospital's building
+# ---------------------------------------------------------------------------------------
+
+
+def _hospital_with_postcode(db_session: Session, postcode: str | None) -> Hospital:
+    _, hospital = make_staff_with_hospital(db_session)
+    hospital.postcode = postcode
+    db_session.add(hospital)
+    db_session.commit()
+    return hospital
+
+
+def test_an_administrator_sees_what_nipost_records_about_the_building(
+    client: TestClient, db_session: Session, monkeypatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "nipost_max_lookup_level", 3)
+    hospital = _hospital_with_postcode(db_session, SANDBOX_POSTCODE)
+    make_admin(db_session)
+    sign_in(client, "admin@example.com")
+
+    body = client.get(f"{API}/admin/hospitals/{hospital.id}/postcode-record").json()
+
+    assert body["valid"] is True
+    assert body["level"] == 3
+    assert body["building_use_status"] == "public"
+    assert body["lga_name"]
+
+
+def test_at_level_1_the_record_says_only_that_the_postcode_is_assigned(
+    client: TestClient, db_session: Session
+) -> None:
+    hospital = _hospital_with_postcode(db_session, SANDBOX_POSTCODE)
+    make_admin(db_session)
+    sign_in(client, "admin@example.com")
+
+    body = client.get(f"{API}/admin/hospitals/{hospital.id}/postcode-record").json()
+
+    assert body["valid"] is True
+    assert body["level"] == 1
+    assert body["house_address"] is None
+    assert body["building_use_status"] is None
+
+
+def test_a_hospital_without_a_postcode_has_no_record(
+    client: TestClient, db_session: Session
+) -> None:
+    hospital = _hospital_with_postcode(db_session, None)
+    make_admin(db_session)
+    sign_in(client, "admin@example.com")
+
+    assert client.get(f"{API}/admin/hospitals/{hospital.id}/postcode-record").status_code == 404
+
+
+def test_only_administrators_see_the_record(client: TestClient, db_session: Session) -> None:
+    hospital = _hospital_with_postcode(db_session, SANDBOX_POSTCODE)
+    sign_in(client, "staff1@example.com")
+
+    assert client.get(f"{API}/admin/hospitals/{hospital.id}/postcode-record").status_code == 403

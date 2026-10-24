@@ -45,3 +45,29 @@ class PostcodeAtRead(BaseModel):
     postcode: str | None
     distance_m: float | None
     source: str
+
+
+class PostcodeRecordRead(BaseModel):
+    """What NIPOST records about a hospital's building, for an administrator reviewing it.
+
+    Attributes:
+        postcode: The hospital's postcode.
+        valid: True when NIPOST has assigned it to a building.
+        level: The lookup level NIPOST answered at. Fields beyond it are empty.
+        state_name: State, from level 2.
+        lga_name: LGA, from level 2, or NIPOST's free reference data below that.
+        locality_name: Town or locality, from level 2.
+        house_address: The most recent address NIPOST holds for the building, from level 2.
+        building_use_status: What the building is used for, from level 3.
+        source: Which dataset answered (see ``PostcodeCheckRead.source``).
+    """
+
+    postcode: str
+    valid: bool
+    level: int
+    state_name: str | None
+    lga_name: str | None
+    locality_name: str | None
+    house_address: str | None
+    building_use_status: str | None
+    source: str
