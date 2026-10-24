@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 
 import { DecisionPanel } from "@/components/admin/DecisionPanel";
+import { PostcodeRecordCard } from "@/components/admin/PostcodeRecordCard";
 import { VerificationBadge } from "@/components/hospital/VerificationBadge";
 import { Container } from "@/components/layout/Container";
 import { LoadError } from "@/components/layout/LoadError";
@@ -148,6 +149,9 @@ function ReviewContent() {
         </Reveal>
 
         <div className="space-y-6">
+          <Reveal delay={80}>
+            <PostcodeRecordCard hospitalId={record.id} postcode={record.postcode} />
+          </Reveal>
           <Reveal delay={80}>
             <Card>
               <CardHeader>
