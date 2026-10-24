@@ -184,9 +184,11 @@ export interface DonorMatch {
   /** Position rounded to about a kilometre, for the map. Never the exact location. */
   approx_latitude: number;
   approx_longitude: number;
+  /** The closest postcode ring the donor shares with the hospital, if both have postcodes. */
+  postcode_ring: PostcodeRing | null;
 }
 
-/** The donors matching a request, nearest first, and the radius that was searched. */
+/** The donors matching a request, closest postcode ring first, then nearest. */
 export interface MatchesResponse {
   items: DonorMatch[];
   total: number;
@@ -390,4 +392,103 @@ export interface PostcodeAt {
   postcode: string | null;
   distance_m: number | null;
   source: PostcodeSource;
+}
+
+/** How closely a donor's postcode agrees with a hospital's, from the closest to the widest. */
+export type PostcodeRing = "area" | "district" | "lga" | "state";
+
+/** What NIPOST records about a hospital's building, for an administrator reviewing it. */
+export interface PostcodeRecord {
+  postcode: string;
+  valid: boolean;
+  /** The lookup level NIPOST answered at. Fields beyond it are empty. */
+  level: number;
+  state_name: string | null;
+  lga_name: string | null;
+  locality_name: string | null;
+  house_address: string | null;
+  building_use_status: string | null;
+  source: PostcodeSource;
+}
+
+/** Reachable donors in one postcode ring around the hospital. Counts only. */
+export interface RingCoverage {
+  ring: PostcodeRing;
+  /** The postcode segments the ring covers, for example `FC-01` for the LGA. */
+  prefix: string;
+  name: string | null;
+  /** Donors in the ring, counting the narrower rings inside it. */
+  total: number;
+  by_group: Partial<Record<BloodGroup, number>>;
+}
+
+/** The donors a hospital can reach, by postcode ring and blood group. */
+export interface Coverage {
+  postcode: string | null;
+  rings: RingCoverage[];
+  without_postcode_nearby: number;
+  radius_km: number;
+}
+
+/** A verified hospital, as anyone looking for one can see it. */
+export interface PublicHospital {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  postcode: string | null;
+  contact_phone: string;
+  latitude: number;
+  longitude: number;
+  /** From the position searched from, when one was given. */
+  distance_km: number | null;
+  /** How close its postcode is to the one searched with. */
+  postcode_ring: PostcodeRing | null;
+}
+
+/** Where a family's appeal stands with the hospital. */
+export type FamilyRequestStatus = "pending" | "approved" | "declined";
+
+/** The answer to a family who has just sent an appeal. */
+export interface FamilyRequestCreated {
+  id: string;
+  status: FamilyRequestStatus;
+  hospital_name: string;
+}
+
+/** What a family sees when following their appeal. Nothing personal. */
+export interface FamilyRequestTracking {
+  id: string;
+  status: FamilyRequestStatus;
+  hospital_name: string;
+  hospital_postcode: string | null;
+  hospital_phone: string;
+  recipient_group: BloodGroup;
+  component_name: string;
+  units_needed: number;
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+  /** The blood request raised from the appeal, once approved. */
+  request_status: RequestStatus | null;
+  units_pledged: number | null;
+}
+
+/** A family's appeal as the hospital's staff see it. */
+export interface FamilyRequest {
+  id: string;
+  requester_name: string;
+  requester_phone: string;
+  recipient_group: BloodGroup;
+  component_code: string;
+  component_name: string;
+  units_needed: number;
+  ward_reference: string;
+  notes: string | null;
+  status: FamilyRequestStatus;
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+  blood_request_id: string | null;
 }
