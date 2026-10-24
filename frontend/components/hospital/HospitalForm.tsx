@@ -5,6 +5,9 @@
  * rejected hospital that is saved goes back to review, which the server handles.
  *
  * The state is not asked for: it follows from the chosen city.
+ *
+ * The facility's NIPOST postcode is optional. When given, it is checked with NIPOST and shown
+ * to donors and families, who can find the building by it.
  */
 
 import { CircleAlert } from "lucide-react";
@@ -15,6 +18,7 @@ import type { FormEvent } from "react";
 
 import { FormField } from "@/components/auth/FormField";
 import { LocationPicker } from "@/components/form/LocationPicker";
+import { PostcodeField } from "@/components/form/PostcodeField";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { failureFromError, focusFirstInvalid } from "@/lib/forms";
@@ -31,16 +35,25 @@ interface FormState {
   city: string;
   /** Device location, when used instead of the centre of the city. */
   precise: Coordinates | null;
+  postcode: string;
 }
 
-const FIELD_ORDER = ["name", "address", "registration_number", "contact_phone", "city"];
+const FIELD_ORDER = ["name", "address", "registration_number", "contact_phone", "city", "postcode"];
 
 // Same shape the server accepts: optional plus sign, then 7 to 15 digits.
 const PHONE_PATTERN = /^\+?\d{7,15}$/;
 
 function initialState(initial: Hospital | null): FormState {
   if (!initial) {
-    return { name: "", address: "", registrationNumber: "", phone: "", city: "", precise: null };
+    return {
+      name: "",
+      address: "",
+      registrationNumber: "",
+      phone: "",
+      city: "",
+      precise: null,
+      postcode: "",
+    };
   }
 
   // Saved coordinates that are not the city centre mean the device location was used.
@@ -57,6 +70,7 @@ function initialState(initial: Hospital | null): FormState {
     phone: initial.contact_phone,
     city: initial.city,
     precise: atCityCentre ? null : { latitude: initial.latitude, longitude: initial.longitude },
+    postcode: initial.postcode ?? "",
   };
 }
 
@@ -128,6 +142,7 @@ export function HospitalForm({ initial }: { initial: Hospital | null }) {
       longitude: coordinates.longitude,
       registration_number: form.registrationNumber.trim() || null,
       contact_phone: form.phone.trim(),
+      postcode: form.postcode.trim() || null,
     };
 
     try {
@@ -217,6 +232,13 @@ export function HospitalForm({ initial }: { initial: Hospital | null }) {
           onPreciseChange={(value) => update("precise", value)}
           error={errors.city}
           deviceButtonLabel="Use my current location (if you are at the hospital)"
+        />
+        <PostcodeField
+          label="The hospital's NIPOST postcode"
+          value={form.postcode}
+          onChange={(value) => update("postcode", value)}
+          error={errors.postcode}
+          hint="Donors and families use it to find the building. Use “Find from my location” while you are at the hospital."
         />
       </section>
 
