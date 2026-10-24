@@ -13,6 +13,8 @@ import { Inbox, Plus } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
 
+import { DonorCoverage } from "@/components/hospital/DonorCoverage";
+import { FamilyRequestsPanel } from "@/components/hospital/FamilyRequestsPanel";
 import { HospitalStats } from "@/components/hospital/HospitalStats";
 import { VerificationBadge } from "@/components/hospital/VerificationBadge";
 import { VerificationSteps } from "@/components/hospital/VerificationSteps";
@@ -205,9 +207,15 @@ function DashboardContent() {
 
       {record.verification_status === "verified" ? (
         <>
+          <Reveal>
+            <FamilyRequestsPanel />
+          </Reveal>
           <OpenRequests />
           <Reveal>
             <HospitalStats />
+          </Reveal>
+          <Reveal>
+            <DonorCoverage />
           </Reveal>
         </>
       ) : null}
