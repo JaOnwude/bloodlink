@@ -237,6 +237,7 @@ function DashboardContent() {
             <CardContent className="space-y-6">
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Address" value={record.address} />
+                <Detail label="NIPOST postcode" value={record.postcode ?? "Not provided"} />
                 <Detail label="City" value={placeName(record.city, record.state)} />
                 <Detail label="Contact phone" value={record.contact_phone} />
                 <Detail
