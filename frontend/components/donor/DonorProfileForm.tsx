@@ -5,6 +5,10 @@
  * closer match can add their device location, which is rounded to about one kilometre before
  * it is sent, so their exact position is never stored.
  *
+ * A donor can also give their NIPOST postcode. It is checked with NIPOST, and only its area
+ * part is kept (for example `FC-01-A01-KP`), so their building is never stored. Leaving the
+ * field empty keeps the area saved before.
+ *
  * The browser checks the obvious problems first. The server applies the full rules, and
  * anything it rejects is shown beside the field it concerns.
  */
@@ -19,6 +23,7 @@ import { FormField } from "@/components/auth/FormField";
 import { CheckboxField } from "@/components/form/CheckboxField";
 import { ChoiceCards } from "@/components/form/ChoiceCards";
 import { LocationPicker } from "@/components/form/LocationPicker";
+import { PostcodeField } from "@/components/form/PostcodeField";
 import { SelectField } from "@/components/form/SelectField";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -41,6 +46,10 @@ interface FormState {
   consent: boolean;
   /** Device location, when the donor chose to use it. Null means "use the city centre". */
   precise: Coordinates | null;
+  /** A full postcode typed or found now. Empty means "keep the saved area". */
+  postcode: string;
+  /** The area saved before, unless the donor removed it in this form. */
+  savedArea: string | null;
 }
 
 /** Field names in the order they appear, used to move focus to the first problem. */
@@ -50,6 +59,7 @@ const FIELD_ORDER = [
   "sex",
   "weight_kg",
   "city",
+  "postcode",
   "last_donation_date",
 ];
 
@@ -70,6 +80,8 @@ function initialState(initial: DonorProfile | null): FormState {
       isAvailable: true,
       consent: false,
       precise: null,
+      postcode: "",
+      savedArea: null,
     };
   }
 
@@ -91,6 +103,8 @@ function initialState(initial: DonorProfile | null): FormState {
     isAvailable: initial.is_available,
     consent: initial.consent_to_contact,
     precise: atCityCentre ? null : { latitude: initial.latitude, longitude: initial.longitude },
+    postcode: "",
+    savedArea: initial.postcode_area,
   };
 }
 
@@ -183,6 +197,12 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
         last_donation_date: form.lastDonation || null,
         is_available: form.isAvailable,
         consent_to_contact: form.consent,
+        // Left out, the saved area is kept; null removes it.
+        ...(form.postcode.trim()
+          ? { postcode: form.postcode }
+          : form.savedArea === null && initial?.postcode_area
+            ? { postcode: null }
+            : {}),
       });
       await router.push("/donor");
     } catch (error) {
@@ -277,6 +297,28 @@ export function DonorProfileForm({ initial }: { initial: DonorProfile | null }) 
           onPreciseChange={(value) => update("precise", value)}
           error={errors.city}
         />
+
+        <PostcodeField
+          value={form.postcode}
+          onChange={(value) => update("postcode", value)}
+          error={errors.postcode}
+          hint="We check it with NIPOST, then keep only the area part, never your building. It helps us reach donors on your street first."
+        />
+        {form.savedArea && !form.postcode.trim() ? (
+          <div className="flex flex-wrap items-center gap-3 text-sm text-ink-muted">
+            <span>
+              Saved area: <span className="font-medium text-ink">{form.savedArea}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => update("savedArea", null)}
+            >
+              Remove
+            </Button>
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-5">
