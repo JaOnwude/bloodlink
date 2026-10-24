@@ -10,6 +10,7 @@ from app.api.routes import (
     auth,
     components,
     donors,
+    family_requests,
     health,
     hospitals,
     pledges,
@@ -28,4 +29,6 @@ api_router.include_router(requests.router)
 api_router.include_router(pledges.router)
 api_router.include_router(components.router)
 api_router.include_router(postcodes.router)
+api_router.include_router(family_requests.public_router)
+api_router.include_router(family_requests.router)
 api_router.include_router(stats.router)
