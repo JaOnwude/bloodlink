@@ -13,6 +13,7 @@ from app.api.routes import (
     health,
     hospitals,
     pledges,
+    postcodes,
     requests,
     stats,
 )
@@ -26,4 +27,5 @@ api_router.include_router(admin.router)
 api_router.include_router(requests.router)
 api_router.include_router(pledges.router)
 api_router.include_router(components.router)
+api_router.include_router(postcodes.router)
 api_router.include_router(stats.router)
