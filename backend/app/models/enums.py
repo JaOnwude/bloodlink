@@ -113,3 +113,16 @@ class NotificationStatus(StrEnum):
     QUEUED = "queued"
     SENT = "sent"
     FAILED = "failed"
+
+
+class FamilyRequestStatus(StrEnum):
+    """Where a family's appeal for blood stands with the hospital it was sent to.
+
+    A family's appeal never reaches donors by itself. It waits as ``pending`` until the
+    hospital confirms the patient is really there and needs blood; ``approved`` means the
+    hospital raised a blood request from it, ``declined`` that the hospital turned it down.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DECLINED = "declined"

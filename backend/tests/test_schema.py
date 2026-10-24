@@ -19,6 +19,7 @@ EXPECTED_TABLES = {
     "donations",
     "donor_deferrals",
     "donors",
+    "family_requests",
     "hospitals",
     "notifications",
     "pledges",
