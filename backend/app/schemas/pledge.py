@@ -87,6 +87,7 @@ class HospitalSummary(BaseModel):
     contact_phone: str
     latitude: float
     longitude: float
+    postcode: str | None = None
 
 
 class DonorRequestSummary(BaseModel):

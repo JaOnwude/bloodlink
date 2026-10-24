@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlmodel import col, select
 
 from app.api.deps import DonorUser, SessionDep
+from app.api.routes.postcodes import PostcodeClientDep, require_assigned_postcode
 from app.core.config import get_settings
 from app.data.deferral_rules import DEFERRAL_RULES
 from app.models import Hospital, Pledge
@@ -60,12 +61,18 @@ def read_my_profile(user: DonorUser, session: SessionDep) -> DonorRead:
     summary="Create or replace my donor profile",
 )
 def save_my_profile(
-    payload: DonorWrite, user: DonorUser, response: Response, session: SessionDep
+    payload: DonorWrite,
+    user: DonorUser,
+    response: Response,
+    session: SessionDep,
+    postcodes: PostcodeClientDep,
 ) -> DonorRead:
     """Create the profile on first use, or replace it afterwards.
 
-    Returns 201 when the profile was created and 200 when an existing one was updated.
+    Returns 201 when the profile was created and 200 when an existing one was updated. A
+    postcode, if given, must be one NIPOST has assigned; only its area part is kept.
     """
+    require_assigned_postcode(postcodes, payload.postcode)
     donor, created = save_donor_profile(session, user, payload)
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
     return DonorRead.model_validate(donor)
@@ -140,6 +147,7 @@ def _hospital_summary(hospital: Hospital) -> HospitalSummary:
         contact_phone=hospital.contact_phone,
         latitude=hospital.latitude,
         longitude=hospital.longitude,
+        postcode=hospital.postcode,
     )
 
 
