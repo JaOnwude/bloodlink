@@ -67,15 +67,24 @@ class AlertRun:
     without_phone: int = 0
 
 
+def _place(hospital: Hospital) -> str:
+    """The city, and the hospital's postcode when it has one: ``Abuja, FC-01-A01-KP-27``."""
+    return f"{hospital.city}, {hospital.postcode}" if hospital.postcode else hospital.city
+
+
 def compose_alert(
     request: BloodRequest, hospital: Hospital, component: ComponentType, distance_km: float
 ) -> str:
-    """The text a donor receives. Kept short, so it fits in very few message parts."""
+    """The text a donor receives. Kept short, so it fits in very few message parts.
+
+    When the hospital has a NIPOST postcode it is included, so a donor on a basic phone can
+    find the exact building, or give the code to a rider, without opening the link.
+    """
     deadline = request.deadline.astimezone(WAT).strftime("%d %b %H:%M")
     urgency = request.urgency.value.upper()
     link = f"{get_settings().frontend_url.rstrip('/')}/donor"
     return (
-        f"BloodLink {urgency}: {hospital.name} ({hospital.city}, {distance_km:.0f} km) needs "
+        f"BloodLink {urgency}: {hospital.name} ({_place(hospital)}, {distance_km:.0f} km) needs "
         f"{request.recipient_group.value} {component.name.lower()} by {deadline} WAT. "
         f"Can you help? Respond at {link}"
     )
@@ -246,7 +255,7 @@ def compose_promotion(request: BloodRequest, hospital: Hospital, component: Comp
     deadline = request.deadline.astimezone(WAT).strftime("%d %b %H:%M")
     link = f"{get_settings().frontend_url.rstrip('/')}/donor"
     return (
-        f"BloodLink: you are now needed. {hospital.name} ({hospital.city}) is counting on you "
+        f"BloodLink: you are now needed. {hospital.name} ({_place(hospital)}) is counting on you "
         f"to give {component.name.lower()} by {deadline} WAT. Details: {link}"
     )
 
