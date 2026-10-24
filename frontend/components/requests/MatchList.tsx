@@ -1,5 +1,9 @@
 /**
- * The donors who can answer an open request, nearest first.
+ * The donors who can answer an open request, in postcode rings and then nearest first.
+ *
+ * When the hospital and a donor both have NIPOST postcodes, the list says how close the
+ * donor's postcode area is ("Same postcode area", "Same LGA", ...). Donors in the hospital's
+ * own area come first and are texted first; the search widens ring by ring.
  *
  * Staff can widen or narrow the search radius. The list is anonymous on purpose: it shows
  * each donor's blood group, city and distance only. A hospital sees a donor's name and phone
@@ -25,7 +29,15 @@ import { MapPanel } from "@/components/map/MapPanel";
 import type { MapDonor } from "@/components/map/RequestMap";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useResource } from "@/lib/use-resource";
-import type { MatchesResponse } from "@/types/api";
+import type { MatchesResponse, PostcodeRing } from "@/types/api";
+
+/** How each postcode ring is described next to a donor. */
+const RING_LABELS: Record<PostcodeRing, string> = {
+  area: "Same postcode area",
+  district: "Same district",
+  lga: "Same LGA",
+  state: "Same state",
+};
 
 /** Search radii offered, in kilometres. The server accepts up to 200. */
 const RADIUS_CHOICES = [10, 25, 50, 100, 200];
@@ -122,9 +134,16 @@ export function MatchList({ requestId, hospital }: MatchListProps) {
                   <span className="block text-sm font-medium text-ink">
                     Donor, {match.blood_group}
                   </span>
-                  <span className="flex items-center gap-1 text-sm text-ink-muted">
-                    <MapPin className="size-3.5" aria-hidden="true" />
-                    {match.city}
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-muted">
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3.5" aria-hidden="true" />
+                      {match.city}
+                    </span>
+                    {match.postcode_ring ? (
+                      <span className="rounded-full bg-trust-50 px-2 py-0.5 text-xs font-medium text-trust-700">
+                        {RING_LABELS[match.postcode_ring]}
+                      </span>
+                    ) : null}
                   </span>
                 </span>
                 <span className="text-sm font-medium text-ink tabular-nums">
