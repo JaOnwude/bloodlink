@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import BeforeValidator
 
+from app.services.postcode import normalise_postcode
+
 # International-style number: optional leading plus, then 7 to 15 digits (the E.164 maximum).
 _PHONE_PATTERN = re.compile(r"^\+?\d{7,15}$")
 
@@ -50,3 +52,24 @@ OptionalPhone = Annotated[str | None, BeforeValidator(_optional_phone)]
 
 # A phone number that must be supplied.
 RequiredPhone = Annotated[str, BeforeValidator(_required_phone)]
+
+
+def _optional_postcode(value: object) -> object:
+    """Bring a postcode to its dashed form, ``FC-01-A01-KP-27``, or reject its shape.
+
+    Only the shape is checked here. Whether NIPOST has assigned the postcode is checked by
+    the route, because that needs a call to NIPOST.
+    """
+    value = blank_to_none(value)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Postcode must be text.")
+    postcode = normalise_postcode(value)
+    if postcode is None:
+        raise ValueError("Enter a full postcode of 11 letters and digits, like FC-01-A01-KP-27.")
+    return postcode
+
+
+# A NIPOST building postcode that may be omitted. Stored in its dashed form.
+OptionalPostcode = Annotated[str | None, BeforeValidator(_optional_postcode)]
