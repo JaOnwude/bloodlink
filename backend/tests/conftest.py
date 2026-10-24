@@ -121,3 +121,15 @@ def never_send_real_sms(monkeypatch: pytest.MonkeyPatch) -> None:
     that check the Termii sender build it themselves with a mock transport.
     """
     monkeypatch.setattr(get_settings(), "sms_provider", "console")
+
+
+@pytest.fixture(autouse=True)
+def never_call_nipost(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the offline postcode mock in every test, whatever ``.env`` says.
+
+    With no key, even the mock's reference data stays built in, so no test depends on the
+    network or spends the key's rate limit. Tests of the NIPOST client build it themselves
+    with a mock transport.
+    """
+    monkeypatch.setattr(get_settings(), "postcode_mode", "mock")
+    monkeypatch.setattr(get_settings(), "nipost_api_key", None)

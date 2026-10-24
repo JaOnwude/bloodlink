@@ -22,6 +22,7 @@ EXPECTED_TABLES = {
     "hospitals",
     "notifications",
     "pledges",
+    "postcode_lookups",
     "users",
 }
 
