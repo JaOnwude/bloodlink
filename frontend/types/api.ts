@@ -61,6 +61,8 @@ export interface DonorProfile {
   latitude: number;
   longitude: number;
   city: string;
+  /** The donor's postcode without its building unit, for example `FC-01-A01-KP`. */
+  postcode_area: string | null;
   last_donation_date: string | null;
   is_available: boolean;
   consent_to_contact: boolean;
@@ -93,6 +95,8 @@ export interface Hospital {
   state: string;
   latitude: number;
   longitude: number;
+  /** The facility's NIPOST building postcode, for example `FC-01-A01-KP-27`. */
+  postcode: string | null;
   registration_number: string | null;
   contact_phone: string;
   verification_status: VerificationStatus;
@@ -261,6 +265,8 @@ export interface HospitalSummary {
   contact_phone: string;
   latitude: number;
   longitude: number;
+  /** The facility's NIPOST building postcode, when it gave one. */
+  postcode: string | null;
 }
 
 /** The request a donor's pledge is for. */
@@ -358,4 +364,30 @@ export interface HospitalStats {
   no_show_rate: number | null;
   units_donated: number;
   donors_alerted: number;
+}
+
+/** Which dataset answered a postcode question: the built-in samples, the NIPOST sandbox or live data. */
+export type PostcodeSource = "mock" | "test" | "live";
+
+/** What BloodLink knows about one postcode, after checking it with NIPOST. */
+export interface PostcodeCheck {
+  postcode: string;
+  /** True when NIPOST has assigned the postcode to a building. */
+  valid: boolean;
+  /** The postcode without its building unit: all a donor's profile keeps. */
+  area_code: string;
+  state_code: string;
+  lga_code: string;
+  state_name: string | null;
+  lga_name: string | null;
+  locality_name: string | null;
+  source: PostcodeSource;
+}
+
+/** The building nearest to a map position, found with NIPOST reverse search. */
+export interface PostcodeAt {
+  found: boolean;
+  postcode: string | null;
+  distance_m: number | null;
+  source: PostcodeSource;
 }
