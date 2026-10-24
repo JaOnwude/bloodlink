@@ -15,6 +15,7 @@ from app.models.donor_deferral import DonorDeferral
 from app.models.hospital import Hospital
 from app.models.notification import Notification
 from app.models.pledge import Pledge
+from app.models.postcode_lookup import PostcodeLookup
 from app.models.user import User
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "Hospital",
     "Notification",
     "Pledge",
+    "PostcodeLookup",
     "User",
 ]
