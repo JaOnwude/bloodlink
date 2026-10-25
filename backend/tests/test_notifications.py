@@ -351,3 +351,19 @@ def test_an_overdue_request_alerts_nobody(db_session: Session, reference_data: N
 
     assert alert_matched_donors(db_session, request.id, sender=sender).newly_alerted == 0
     assert sender.sent == []
+
+
+def test_the_message_gives_the_hospital_s_postcode_when_it_has_one(
+    db_session: Session, reference_data: None
+) -> None:
+    _, hospital, request = setup(db_session)
+    hospital.postcode = "FC-01-A01-KP-27"
+    db_session.add(hospital)
+    db_session.commit()
+    donor_with_phone(db_session, "a@example.com", "+2348000000001")
+    sender = RecordingSender()
+
+    alert_matched_donors(db_session, request.id, sender=sender)
+
+    [(_, text)] = sender.sent
+    assert "FC-01-A01-KP-27" in text

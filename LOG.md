@@ -184,3 +184,46 @@ the national transfusion service and WHO figures are cited.
 
 **Next:** Complete `RESEARCH.md`, replace the eligibility placeholders with cited figures,
 add cited statistics to the landing page and README, and prepare for the viva.
+
+## 2026-10-21 · Day 7: standby donors and screening outcomes
+
+**Built:**
+- **Standby donors.** Requests take a number of standby places (the form suggests about
+  half the units). Once every unit is pledged, donors can join the standby list. When a
+  pledged donor cancels, does not attend or is deferred, the oldest standby pledge is
+  promoted under the same row lock and the donor is texted. Standby donors are released
+  when every unit is given, the request is closed, or its deadline passes.
+- **Screening outcomes.** A third outcome, deferred at screening, with a reason category
+  and a deferral period read from `app/data/deferral_rules.py`.
+- **Migration** `ca124c6e6791`: `blood_requests.standby_units`, `pledges.deferral_reason`,
+  and the pledge states `standby`, `deferred` and `released`. The downgrade maps them back
+  onto the old states.
+- 22 new tests (338 in total).
+
+**Decisions:**
+- **Standby pledges never count against `units_needed`,** so the no-overbooking guarantee
+  is unchanged; the reserve has its own cap.
+- **A positive screen is never shown to the donor.** Only the category is stored, never a
+  result, and the donor is asked to contact the hospital. Staff see a clear label; the
+  record kept with the donor uses a neutral one.
+- **Promotion texts are best effort** and are not recorded in the alerts table, which
+  keeps its meaning of "first alert for a request".
+- **Deferral periods are placeholders,** like the waiting periods, until confirmed with a
+  blood bank.
+
+**Learned:**
+- **A race test with two donors passed even without the lock.** Two threads rarely
+  collide. With 12 donors for 5 places it fails every time without the lock, so it now
+  proves something.
+- **Constraint names in hand-written migrations need `op.f()`.** Without it, the naming
+  convention prefixed the name twice and the upgrade failed. Because the commands were
+  chained with their output piped away, the failure was hidden and a following
+  `downgrade` dropped every table in the local development database. It was rebuilt from
+  the migrations and the seed scripts; production was never touched. Migration steps are
+  now run one at a time, and each result is read before the next.
+
+**Changed plans:**
+- The tutor agreed that the user interviews (`RESEARCH.md`) move to the next project. The
+  README now states that pricing and priorities are assumptions, not findings.
+- The tutor's feedback on the fonts, the general look and the carousel is noted for a
+  later design pass.

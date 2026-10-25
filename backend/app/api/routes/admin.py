@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import AdminUser, ClientIp, SessionDep
+from app.api.routes.postcodes import PostcodeClientDep
 from app.models import Hospital, User
 from app.models.enums import VerificationStatus
 from app.schemas.hospital import (
@@ -19,6 +20,7 @@ from app.schemas.hospital import (
     RejectRequest,
     StaffSummary,
 )
+from app.schemas.postcode import PostcodeRecordRead
 from app.services.hospitals import (
     HospitalNotFoundError,
     InvalidHospitalStateError,
@@ -28,6 +30,7 @@ from app.services.hospitals import (
     reject_hospital,
     verify_hospital,
 )
+from app.services.postcode import PostcodeServiceError, lookup_postcode, parse_postcode
 
 router = APIRouter(prefix="/admin/hospitals", tags=["admin"])
 
@@ -136,3 +139,60 @@ def reject_registration(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from None
     staff = get_staff_by_hospital(session, [hospital.id])
     return _to_admin_read(hospital, staff[hospital.id])
+
+
+# The most detail an administrator's check asks for: level 3 adds what the building is used
+# for. Capped by the level NIPOST has granted; paid answers are cached, so a hospital's
+# building is paid for once however often it is reviewed.
+_REVIEW_LEVEL = 3
+
+
+@router.get(
+    "/{hospital_id}/postcode-record",
+    response_model=PostcodeRecordRead,
+    summary="What NIPOST records about a hospital's building",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "No such hospital, or it has no postcode"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "NIPOST could not answer"},
+    },
+)
+def read_postcode_record(
+    hospital_id: UUID, _admin: AdminUser, session: SessionDep, postcodes: PostcodeClientDep
+) -> PostcodeRecordRead:
+    """Look the hospital's postcode up with NIPOST, to compare with what it registered.
+
+    A "hospital" whose postcode belongs to a residential building, or to an address in
+    another town, is worth a closer look before it is verified and can alert donors.
+    """
+    try:
+        hospital = get_hospital(session, hospital_id)
+    except HospitalNotFoundError:
+        raise _not_found() from None
+    segments = parse_postcode(hospital.postcode) if hospital.postcode else None
+    if segments is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="This hospital gave no postcode."
+        )
+
+    try:
+        result = lookup_postcode(session, postcodes, segments.postcode, _REVIEW_LEVEL)
+        admin = result.administrative_address
+        lga_name = admin.lga_name if admin else None
+        if lga_name is None and result.valid:
+            lga_name = postcodes.lga_names(segments.state).get(segments.lga)
+    except PostcodeServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from None
+
+    return PostcodeRecordRead(
+        postcode=segments.postcode,
+        valid=result.valid,
+        level=result.level,
+        state_name=admin.state_name if admin else None,
+        lga_name=lga_name,
+        locality_name=admin.locality_name if admin else None,
+        house_address=result.house_address,
+        building_use_status=result.building_use_status,
+        source=postcodes.name,
+    )

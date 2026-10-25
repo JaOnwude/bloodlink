@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 
 from app.models import Donor, User
 from app.schemas.donor import DonorWrite
+from app.services.postcode import parse_postcode
 
 
 def get_donor_for_user(session: Session, user: User) -> Donor | None:
@@ -21,8 +22,15 @@ def save_donor_profile(session: Session, user: User, data: DonorWrite) -> tuple[
     If two first-time saves for the same user arrive at once, the database's unique
     constraint rejects the second insert; it is then retried as an update instead of
     failing.
+
+    The postcode is cut back to its area before it is stored, so the donor's building is
+    never kept. It must already have been checked with NIPOST by the caller. When the
+    postcode is left out of the request, the area saved before is kept.
     """
-    values = data.model_dump()
+    values: dict[str, object] = data.model_dump(exclude={"postcode"})
+    if "postcode" in data.model_fields_set:
+        segments = parse_postcode(data.postcode) if data.postcode else None
+        values["postcode_area"] = segments.area_code if segments else None
 
     donor = get_donor_for_user(session, user)
     if donor is None:

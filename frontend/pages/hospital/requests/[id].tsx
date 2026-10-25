@@ -123,7 +123,18 @@ function RequestContent() {
               <CardDescription>Raised on {formatDateTime(record.created_at)}.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <UnitsProgress needed={record.units_needed} pledged={record.units_pledged} />
+              <div className="space-y-1.5">
+                <UnitsProgress needed={record.units_needed} pledged={record.units_pledged} />
+                {record.standby_units > 0 ? (
+                  <p className="text-sm text-ink-muted">
+                    <span className="font-medium text-ink">
+                      {record.standby_pledged} of {record.standby_units}
+                    </span>{" "}
+                    standby {record.standby_units === 1 ? "place" : "places"} taken. Standby donors are
+                    called in automatically if a pledged donor cannot give.
+                  </p>
+                ) : null}
+              </div>
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <Detail
                   label="Needed by"

@@ -16,7 +16,13 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from app.models.enums import BloodGroup, PledgeStatus, RequestStatus, RequestUrgency
+from app.models.enums import (
+    BloodGroup,
+    DeferralReason,
+    PledgeStatus,
+    RequestStatus,
+    RequestUrgency,
+)
 
 
 class PledgeRead(BaseModel):
@@ -26,6 +32,7 @@ class PledgeRead(BaseModel):
         request_status: The request's state after the change, for example ``fulfilled``
             when this pledge took the last unit.
         units_remaining: Units the request still needs after the change.
+        standby_places_left: Standby places still free after the change.
     """
 
     id: UUID
@@ -35,6 +42,7 @@ class PledgeRead(BaseModel):
     resolved_at: datetime | None
     request_status: RequestStatus
     units_remaining: int
+    standby_places_left: int
 
 
 class PledgedDonor(BaseModel):
@@ -53,12 +61,18 @@ class PledgedDonor(BaseModel):
 
 
 class HospitalPledgeRead(BaseModel):
-    """A pledge to one of the hospital's requests."""
+    """A pledge to one of the hospital's requests.
+
+    Attributes:
+        deferral_reason: Why the donor was turned away at screening, for a deferred pledge.
+            Only the hospital that recorded it sees it.
+    """
 
     id: UUID
     status: PledgeStatus
     pledged_at: datetime
     resolved_at: datetime | None
+    deferral_reason: DeferralReason | None
     donor: PledgedDonor
 
 
@@ -73,6 +87,7 @@ class HospitalSummary(BaseModel):
     contact_phone: str
     latitude: float
     longitude: float
+    postcode: str | None = None
 
 
 class DonorRequestSummary(BaseModel):
@@ -88,12 +103,17 @@ class DonorRequestSummary(BaseModel):
 
 
 class DonorPledgeRead(BaseModel):
-    """One of the donor's own pledges."""
+    """One of the donor's own pledges.
+
+    Attributes:
+        outcome_message: For a deferral, what the donor is told. Never the reason itself.
+    """
 
     id: UUID
     status: PledgeStatus
     pledged_at: datetime
     resolved_at: datetime | None
+    outcome_message: str | None
     request: DonorRequestSummary
     hospital: HospitalSummary
 
@@ -112,7 +132,11 @@ class OpenRequestForDonor(BaseModel):
 
     Attributes:
         distance_km: Straight-line distance from the donor to the hospital.
+        units_remaining: Units still free. Zero when only standby places are left.
+        standby_places_left: Standby places free once every unit is pledged.
         my_pledge_id: The donor's active pledge for this request, if they have one.
+        my_pledge_status: Whether that pledge takes a unit (``pledged``) or is in reserve
+            (``standby``).
     """
 
     id: UUID
@@ -123,9 +147,11 @@ class OpenRequestForDonor(BaseModel):
     deadline: datetime
     notes: str | None
     units_remaining: int
+    standby_places_left: int
     distance_km: float
     hospital: HospitalSummary
     my_pledge_id: UUID | None
+    my_pledge_status: PledgeStatus | None
 
 
 class OpenRequestsForDonor(BaseModel):
@@ -133,3 +159,21 @@ class OpenRequestsForDonor(BaseModel):
 
     items: list[OpenRequestForDonor]
     radius_km: float
+
+
+class DeferralCreate(BaseModel):
+    """Why a donor who came was turned away at screening.
+
+    Only the category is recorded, never a test result. It sets how long the donor is
+    deferred (see ``app.data.deferral_rules``).
+    """
+
+    reason: DeferralReason
+
+
+class DeferralReasonRead(BaseModel):
+    """A screening outcome staff can choose, with how long it defers the donor."""
+
+    code: DeferralReason
+    label: str
+    deferral_days: int | None

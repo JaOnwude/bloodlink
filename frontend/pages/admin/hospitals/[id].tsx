@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 
 import { DecisionPanel } from "@/components/admin/DecisionPanel";
+import { PostcodeRecordCard } from "@/components/admin/PostcodeRecordCard";
 import { VerificationBadge } from "@/components/hospital/VerificationBadge";
 import { Container } from "@/components/layout/Container";
 import { LoadError } from "@/components/layout/LoadError";
@@ -97,7 +98,10 @@ function ReviewContent() {
       </Reveal>
 
       {notice ? (
-        <div role="status" className="rounded-2xl bg-trust-50 p-4 text-sm font-medium text-trust-700">
+        <div
+          role="status"
+          className="rounded-2xl bg-trust-50 p-4 text-sm font-medium text-trust-700"
+        >
           {notice}
         </div>
       ) : null}
@@ -112,6 +116,7 @@ function ReviewContent() {
             <CardContent className="space-y-6">
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Address" value={record.address} />
+                <Detail label="NIPOST postcode" value={record.postcode ?? "Not provided"} />
                 <Detail label="City" value={`${record.city}, ${record.state}`} />
                 <Detail label="Contact phone" value={record.contact_phone} />
                 <Detail
@@ -144,6 +149,9 @@ function ReviewContent() {
         </Reveal>
 
         <div className="space-y-6">
+          <Reveal delay={80}>
+            <PostcodeRecordCard hospitalId={record.id} postcode={record.postcode} />
+          </Reveal>
           <Reveal delay={80}>
             <Card>
               <CardHeader>

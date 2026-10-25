@@ -10,7 +10,9 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlmodel import col, select
 
 from app.api.deps import DonorUser, SessionDep
+from app.api.routes.postcodes import PostcodeClientDep, require_assigned_postcode
 from app.core.config import get_settings
+from app.data.deferral_rules import DEFERRAL_RULES
 from app.models import Hospital, Pledge
 from app.models.enums import PledgeStatus
 from app.schemas.donor import (
@@ -59,12 +61,18 @@ def read_my_profile(user: DonorUser, session: SessionDep) -> DonorRead:
     summary="Create or replace my donor profile",
 )
 def save_my_profile(
-    payload: DonorWrite, user: DonorUser, response: Response, session: SessionDep
+    payload: DonorWrite,
+    user: DonorUser,
+    response: Response,
+    session: SessionDep,
+    postcodes: PostcodeClientDep,
 ) -> DonorRead:
     """Create the profile on first use, or replace it afterwards.
 
-    Returns 201 when the profile was created and 200 when an existing one was updated.
+    Returns 201 when the profile was created and 200 when an existing one was updated. A
+    postcode, if given, must be one NIPOST has assigned; only its area part is kept.
     """
+    require_assigned_postcode(postcodes, payload.postcode)
     donor, created = save_donor_profile(session, user, payload)
     response.status_code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
     return DonorRead.model_validate(donor)
@@ -118,6 +126,17 @@ def read_my_eligibility(user: DonorUser, session: SessionDep) -> EligibilityRead
     )
 
 
+def _outcome_message(pledge: Pledge) -> str | None:
+    """What a deferred donor is told about why, from the deferral rules.
+
+    Only the message written for the donor is returned, never the recorded reason, so a
+    positive infection screen is never revealed through BloodLink.
+    """
+    if pledge.status != PledgeStatus.DEFERRED or pledge.deferral_reason is None:
+        return None
+    return DEFERRAL_RULES[pledge.deferral_reason].donor_message
+
+
 def _hospital_summary(hospital: Hospital) -> HospitalSummary:
     return HospitalSummary(
         id=hospital.id,
@@ -128,6 +147,7 @@ def _hospital_summary(hospital: Hospital) -> HospitalSummary:
         contact_phone=hospital.contact_phone,
         latitude=hospital.latitude,
         longitude=hospital.longitude,
+        postcode=hospital.postcode,
     )
 
 
@@ -155,15 +175,16 @@ def read_my_open_requests(
     found = find_requests_for_donor(session, donor, radius_km=radius)
 
     active = (
-        dict(
-            session.exec(
-                select(Pledge.request_id, Pledge.id).where(
+        {
+            request_id: (pledge_id, pledge_status)
+            for request_id, pledge_id, pledge_status in session.exec(
+                select(Pledge.request_id, Pledge.id, Pledge.status).where(
                     Pledge.donor_id == donor.id,
-                    Pledge.status == PledgeStatus.PLEDGED,
+                    col(Pledge.status).in_((PledgeStatus.PLEDGED, PledgeStatus.STANDBY)),
                     col(Pledge.request_id).in_([item.request.id for item in found]),
                 )
             ).all()
-        )
+        }
         if found
         else {}
     )
@@ -179,9 +200,13 @@ def read_my_open_requests(
                 deadline=item.request.deadline,
                 notes=item.request.notes,
                 units_remaining=item.units_remaining,
+                standby_places_left=item.standby_places_left,
                 distance_km=round(item.distance_km, 1),
                 hospital=_hospital_summary(item.hospital),
-                my_pledge_id=active.get(item.request.id),
+                my_pledge_id=active[item.request.id][0] if item.request.id in active else None,
+                my_pledge_status=(
+                    active[item.request.id][1] if item.request.id in active else None
+                ),
             )
             for item in found
         ],
@@ -214,6 +239,7 @@ def read_my_pledges(
                 status=view.pledge.status,
                 pledged_at=view.pledge.pledged_at,
                 resolved_at=view.pledge.resolved_at,
+                outcome_message=_outcome_message(view.pledge),
                 request=DonorRequestSummary(
                     id=view.request.id,
                     recipient_group=view.request.recipient_group,

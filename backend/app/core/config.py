@@ -12,7 +12,7 @@ import re
 from functools import lru_cache
 from typing import Literal, Self
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Value used when no SECRET_KEY is provided. It is convenient for local development and
@@ -66,6 +66,15 @@ class Settings(BaseSettings):
         sms_timeout_seconds: How long to wait for the SMS provider before giving up.
         alert_max_donors: Most donors alerted for one request in a single run, nearest
             first, so a request never sends a flood of messages.
+        postcode_mode: Where postcode answers come from. ``mock`` answers from a small
+            built-in set of sample buildings and needs no key; ``test`` calls the NIPOST
+            sandbox with a ``nipost_test_`` key; ``live`` calls the production dataset with
+            a ``nipost_live_`` key, which requires NIPOST business verification.
+        nipost_api_key: Secret key from the NIPOST developer dashboard. Server-side only.
+        nipost_base_url: Address of the NIPOST Postcode API gateway.
+        nipost_max_lookup_level: Highest lookup level NIPOST has granted the organisation.
+            Requests for more detail are capped at this level instead of being refused.
+        postcode_timeout_seconds: How long to wait for NIPOST before giving up.
 
     Note:
         The password limits follow NIST SP 800-63B-4: at least 15 characters when the
@@ -122,9 +131,16 @@ class Settings(BaseSettings):
     sms_timeout_seconds: float = 10.0
     alert_max_donors: int = 20
 
+    postcode_mode: Literal["mock", "test", "live"] = "mock"
+    nipost_api_key: str | None = None
+    nipost_base_url: str = "https://api.postcode.gov.ng"
+    nipost_max_lookup_level: int = Field(default=1, ge=1, le=5)
+    postcode_timeout_seconds: float = 10.0
+
     @field_validator(
         "demo_password",
         "demo_donor_phone",
+        "nipost_api_key",
         "termii_api_key",
         "termii_base_url",
         "termii_sender_id",
@@ -137,7 +153,7 @@ class Settings(BaseSettings):
             return None
         return value
 
-    @field_validator("sms_provider", "termii_channel", mode="before")
+    @field_validator("sms_provider", "termii_channel", "postcode_mode", mode="before")
     @classmethod
     def _blank_choice_is_default(cls, value: object, info: ValidationInfo) -> object:
         """An empty choice falls back to the default instead of failing validation."""
@@ -158,6 +174,17 @@ class Settings(BaseSettings):
     def termii_ready(self) -> bool:
         """Whether every value needed to send through Termii is present and well formed."""
         return bool(self.termii_api_key and self.termii_base_url and self.termii_sender_id_valid)
+
+    @property
+    def nipost_key_matches_mode(self) -> bool:
+        """Whether the NIPOST key belongs to the chosen environment.
+
+        A test key only reads the sandbox and a live key only the production dataset, so a
+        key from the wrong environment would answer "not found" for every real postcode.
+        """
+        if not self.nipost_api_key:
+            return False
+        return self.nipost_api_key.startswith(f"nipost_{self.postcode_mode}_")
 
     @property
     def session_cookie_secure(self) -> bool:

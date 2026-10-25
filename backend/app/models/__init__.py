@@ -12,9 +12,11 @@ from app.models.component_type import ComponentType
 from app.models.donation import Donation
 from app.models.donor import Donor
 from app.models.donor_deferral import DonorDeferral
+from app.models.family_request import FamilyRequest
 from app.models.hospital import Hospital
 from app.models.notification import Notification
 from app.models.pledge import Pledge
+from app.models.postcode_lookup import PostcodeLookup
 from app.models.user import User
 
 __all__ = [
@@ -25,8 +27,10 @@ __all__ = [
     "Donation",
     "Donor",
     "DonorDeferral",
+    "FamilyRequest",
     "Hospital",
     "Notification",
     "Pledge",
+    "PostcodeLookup",
     "User",
 ]

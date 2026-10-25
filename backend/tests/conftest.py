@@ -24,7 +24,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 import app.models  # noqa: F401  (registers every table on SQLModel.metadata)
 from app.core.config import get_settings
-from app.core.rate_limit import get_login_limiter
+from app.core.rate_limit import get_appeal_limiter, get_login_limiter
 from app.db.seed import seed_reference_data
 from app.db.session import get_session
 from app.main import app
@@ -99,6 +99,7 @@ def client(db_engine: Engine, clean_database: None) -> Generator[TestClient, Non
 
     app.dependency_overrides[get_session] = override_get_session
     get_login_limiter().clear()
+    get_appeal_limiter().clear()
     try:
         with TestClient(app) as test_client:
             yield test_client
@@ -121,3 +122,15 @@ def never_send_real_sms(monkeypatch: pytest.MonkeyPatch) -> None:
     that check the Termii sender build it themselves with a mock transport.
     """
     monkeypatch.setattr(get_settings(), "sms_provider", "console")
+
+
+@pytest.fixture(autouse=True)
+def never_call_nipost(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the offline postcode mock in every test, whatever ``.env`` says.
+
+    With no key, even the mock's reference data stays built in, so no test depends on the
+    network or spends the key's rate limit. Tests of the NIPOST client build it themselves
+    with a mock transport.
+    """
+    monkeypatch.setattr(get_settings(), "postcode_mode", "mock")
+    monkeypatch.setattr(get_settings(), "nipost_api_key", None)

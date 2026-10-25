@@ -67,12 +67,36 @@ class RequestStatus(StrEnum):
 
 
 class PledgeStatus(StrEnum):
-    """State of a single donor's commitment to a request."""
+    """State of a single donor's commitment to a request.
+
+    ``STANDBY`` is a donor waiting in reserve after every unit has been pledged; they are
+    promoted to ``PLEDGED`` if a pledged donor cannot give. ``DEFERRED`` means the donor
+    came but was turned away at screening. ``RELEASED`` means a standby donor was not
+    needed, because the request was met or ended.
+    """
 
     PLEDGED = "pledged"
+    STANDBY = "standby"
     DONATED = "donated"
     NO_SHOW = "no_show"
+    DEFERRED = "deferred"
     CANCELLED = "cancelled"
+    RELEASED = "released"
+
+
+class DeferralReason(StrEnum):
+    """Why a donor was turned away at screening, recorded as a category only.
+
+    No clinical detail or test result is stored: the category sets how long the donor is
+    deferred, and the donor is told to contact the hospital for anything more.
+    """
+
+    LOW_HAEMOGLOBIN = "low_haemoglobin"
+    BLOOD_PRESSURE = "blood_pressure"
+    RECENT_ILLNESS = "recent_illness"
+    MEDICATION = "medication"
+    POSITIVE_SCREEN = "positive_screen"
+    OTHER = "other"
 
 
 class NotificationChannel(StrEnum):
@@ -89,3 +113,16 @@ class NotificationStatus(StrEnum):
     QUEUED = "queued"
     SENT = "sent"
     FAILED = "failed"
+
+
+class FamilyRequestStatus(StrEnum):
+    """Where a family's appeal for blood stands with the hospital it was sent to.
+
+    A family's appeal never reaches donors by itself. It waits as ``pending`` until the
+    hospital confirms the patient is really there and needs blood; ``approved`` means the
+    hospital raised a blood request from it, ``declined`` that the hospital turned it down.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    DECLINED = "declined"

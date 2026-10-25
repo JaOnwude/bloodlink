@@ -26,3 +26,37 @@ class HospitalStatsRead(BaseModel):
     no_show_rate: float | None
     units_donated: int
     donors_alerted: int
+
+
+class RingCoverageRead(BaseModel):
+    """Donors in one postcode ring around the hospital. See ``app.services.coverage``.
+
+    Attributes:
+        ring: ``area``, ``district``, ``lga`` or ``state``.
+        prefix: The postcode segments the ring covers, for example ``FC-01`` for the LGA.
+        name: The ring's place name when NIPOST gives one (the LGA and the state).
+        total: Donors in the ring, counting the narrower rings inside it.
+        by_group: The same donors by blood group, for example ``{"O-": 2}``.
+    """
+
+    ring: str
+    prefix: str
+    name: str | None
+    total: int
+    by_group: dict[str, int]
+
+
+class CoverageRead(BaseModel):
+    """The donors a hospital can reach, by postcode ring and blood group. Counts only.
+
+    Attributes:
+        postcode: The hospital's postcode; empty when it has none, and so are the rings.
+        rings: One entry per ring, the hospital's own area first.
+        without_postcode_nearby: Reachable donors within ``radius_km`` who gave no postcode.
+        radius_km: The radius used for that count.
+    """
+
+    postcode: str | None
+    rings: list[RingCoverageRead]
+    without_postcode_nearby: int
+    radius_km: float

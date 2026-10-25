@@ -22,6 +22,7 @@ export const siteConfig = {
 
   /** Links shown in the main navigation. */
   nav: [
+    { label: "Need blood?", href: "/find-blood" },
     { label: "How it works", href: "/#how-it-works" },
     { label: "Pricing", href: "/#pricing" },
     { label: "For donors", href: "/#donors" },
@@ -36,6 +37,10 @@ export const siteConfig = {
         { label: "Pricing", href: "/#pricing" },
         { label: "Register your hospital", href: "/register?as=hospital" },
       ],
+    },
+    {
+      title: "Families",
+      links: [{ label: "Find blood for a patient", href: "/find-blood" }],
     },
     {
       title: "Donors",

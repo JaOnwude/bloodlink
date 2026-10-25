@@ -93,3 +93,18 @@ def get_login_limiter() -> LoginRateLimiter:
         max_attempts=settings.login_max_failed_attempts,
         window_seconds=settings.login_window_seconds,
     )
+
+
+# Appeals one network address may send to hospitals per hour from the public page. Generous
+# for a family asking a few hospitals, far too few for anyone trying to flood staff.
+APPEALS_PER_HOUR = 5
+
+
+@lru_cache
+def get_appeal_limiter() -> LoginRateLimiter:
+    """Return the process-wide limiter for families' appeals.
+
+    It reuses the sliding window built for sign-ins: here every appeal sent counts as an
+    attempt, whether or not it succeeds.
+    """
+    return LoginRateLimiter(max_attempts=APPEALS_PER_HOUR, window_seconds=60 * 60)

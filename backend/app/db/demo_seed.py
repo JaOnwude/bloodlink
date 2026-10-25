@@ -15,6 +15,10 @@ Design choices:
 * **The real rules.** Requests, pledges and donations are created through the same
   services the API uses, so the row locks, the eligibility rules and the audit log all
   apply, and the data is exactly what the application itself would have produced.
+* **Sample postcodes in Abuja.** The Abuja hospital and donors carry postcodes from
+  NIPOST's published sandbox (see ``app.data.postcode_samples``), so the postcode features
+  can be shown on the mock or the NIPOST sandbox. Donors keep only the area part, as real
+  donors do. Lagos and Enugu have no sandbox postcodes, so their records have none.
 * **Run once.** Seeding is skipped when the demonstration administrator already exists, so
   running it again changes nothing.
 
@@ -29,11 +33,13 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
+from app.data.postcode_samples import SAMPLE_BUILDINGS
 from app.db.seed import seed_reference_data
 from app.models import BloodRequest, Donation, Donor, DonorDeferral, Hospital, Pledge, User
 from app.models.base import utcnow
 from app.models.enums import (
     BloodGroup,
+    PledgeStatus,
     RequestStatus,
     RequestUrgency,
     Sex,
@@ -70,6 +76,7 @@ class _HospitalSpec:
     staff_name: str
     offset: tuple[float, float] = (0.0, 0.0)
     rejection_reason: str | None = None
+    postcode: str | None = None
 
 
 _HOSPITALS = (
@@ -89,6 +96,7 @@ _HOSPITALS = (
         city="Abuja",
         status=VerificationStatus.VERIFIED,
         staff_name="Ibrahim Musa",
+        postcode=SAMPLE_BUILDINGS[0].postcode,
     ),
     _HospitalSpec(
         key="enugu",
@@ -256,6 +264,7 @@ def _create_hospitals(
             state=city["state"],
             latitude=round(city["latitude"] + spec.offset[0], 6),
             longitude=round(city["longitude"] + spec.offset[1], 6),
+            postcode=spec.postcode,
             registration_number=f"DEMO-{number:04d}",
             # Not a real line: a demonstration must never send anyone to call a stranger.
             contact_phone=f"+23400000000{number:02d}",
@@ -281,6 +290,12 @@ def _create_hospitals(
     return created
 
 
+def _sample_area(index: int) -> str:
+    """The area part of one of the sample postcodes, spreading donors across all five."""
+    postcode = SAMPLE_BUILDINGS[index % len(SAMPLE_BUILDINGS)].postcode
+    return postcode.rsplit("-", 1)[0]
+
+
 def _create_donors(
     session: Session,
     admin: User,
@@ -300,7 +315,7 @@ def _create_donors(
     number = 0
     for city_name, groups in _DONOR_GROUPS.items():
         city = _CITIES[city_name]
-        for group in groups:
+        for index, group in enumerate(groups):
             number += 1
             sex = Sex.MALE if rng.random() < 0.55 else Sex.FEMALE
             full_name = f"{rng.choice(_FIRST_NAMES[sex])} {rng.choice(_LAST_NAMES)}"
@@ -323,6 +338,7 @@ def _create_donors(
                 latitude=round(city["latitude"] + rng.uniform(-0.07, 0.07), 6),
                 longitude=round(city["longitude"] + rng.uniform(-0.07, 0.07), 6),
                 city=city_name,
+                postcode_area=_sample_area(index) if city_name == "Abuja" else None,
                 last_donation_date=(
                     today - timedelta(days=rng.randint(130, 400)) if rng.random() < 0.6 else None
                 ),
@@ -472,7 +488,7 @@ def seed_demo_data(
         session, lagos, lagos_staff, group="O+", units=1, urgency=RequestUrgency.ROUTINE, hours=72
     )
     donated = _pledge(session, lagos_a_pos_donors[1], routine)
-    resolve_pledge(session, lagos_staff, donated.id, donated=True, ip_address=None)
+    resolve_pledge(session, lagos_staff, donated.id, outcome=PledgeStatus.DONATED, ip_address=None)
 
     # Lagos: a request whose deadline passed before anyone pledged.
     expired = BloodRequest(

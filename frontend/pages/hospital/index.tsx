@@ -13,6 +13,8 @@ import { Inbox, Plus } from "lucide-react";
 import Head from "next/head";
 import Link from "next/link";
 
+import { DonorCoverage } from "@/components/hospital/DonorCoverage";
+import { FamilyRequestsPanel } from "@/components/hospital/FamilyRequestsPanel";
 import { HospitalStats } from "@/components/hospital/HospitalStats";
 import { VerificationBadge } from "@/components/hospital/VerificationBadge";
 import { VerificationSteps } from "@/components/hospital/VerificationSteps";
@@ -205,9 +207,15 @@ function DashboardContent() {
 
       {record.verification_status === "verified" ? (
         <>
+          <Reveal>
+            <FamilyRequestsPanel />
+          </Reveal>
           <OpenRequests />
           <Reveal>
             <HospitalStats />
+          </Reveal>
+          <Reveal>
+            <DonorCoverage />
           </Reveal>
         </>
       ) : null}
@@ -237,6 +245,7 @@ function DashboardContent() {
             <CardContent className="space-y-6">
               <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Detail label="Address" value={record.address} />
+                <Detail label="NIPOST postcode" value={record.postcode ?? "Not provided"} />
                 <Detail label="City" value={placeName(record.city, record.state)} />
                 <Detail label="Contact phone" value={record.contact_phone} />
                 <Detail

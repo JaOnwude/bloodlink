@@ -41,6 +41,7 @@ export function ProfileSummary({ profile }: { profile: DonorProfile }) {
 
         <dl className="grid grid-cols-2 gap-4">
           <Detail label="City" value={profile.city} />
+          <Detail label="Postcode area" value={profile.postcode_area ?? "Not given"} />
           <Detail label="Weight" value={`${profile.weight_kg} kg`} />
           <Detail
             label="Last donation"

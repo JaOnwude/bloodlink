@@ -61,6 +61,8 @@ export interface DonorProfile {
   latitude: number;
   longitude: number;
   city: string;
+  /** The donor's postcode without its building unit, for example `FC-01-A01-KP`. */
+  postcode_area: string | null;
   last_donation_date: string | null;
   is_available: boolean;
   consent_to_contact: boolean;
@@ -93,6 +95,8 @@ export interface Hospital {
   state: string;
   latitude: number;
   longitude: number;
+  /** The facility's NIPOST building postcode, for example `FC-01-A01-KP-27`. */
+  postcode: string | null;
   registration_number: string | null;
   contact_phone: string;
   verification_status: VerificationStatus;
@@ -149,6 +153,9 @@ export interface BloodRequest {
   units_needed: number;
   units_pledged: number;
   units_remaining: number;
+  /** Extra donors accepted in reserve once every unit is pledged. */
+  standby_units: number;
+  standby_pledged: number;
   urgency: RequestUrgency;
   deadline: string;
   notes: string | null;
@@ -177,9 +184,11 @@ export interface DonorMatch {
   /** Position rounded to about a kilometre, for the map. Never the exact location. */
   approx_latitude: number;
   approx_longitude: number;
+  /** The closest postcode ring the donor shares with the hospital, if both have postcodes. */
+  postcode_ring: PostcodeRing | null;
 }
 
-/** The donors matching a request, nearest first, and the radius that was searched. */
+/** The donors matching a request, closest postcode ring first, then nearest. */
 export interface MatchesResponse {
   items: DonorMatch[];
   total: number;
@@ -187,7 +196,30 @@ export interface MatchesResponse {
 }
 
 /** Where a donor's commitment to a request stands. */
-export type PledgeStatus = "pledged" | "donated" | "no_show" | "cancelled";
+export type PledgeStatus =
+  | "pledged"
+  | "standby"
+  | "donated"
+  | "no_show"
+  | "deferred"
+  | "cancelled"
+  | "released";
+
+/** Why a donor was turned away at screening. Only the category is ever recorded. */
+export type DeferralReason =
+  | "low_haemoglobin"
+  | "blood_pressure"
+  | "recent_illness"
+  | "medication"
+  | "positive_screen"
+  | "other";
+
+/** A screening outcome staff can choose, with how long it defers the donor (null: permanently). */
+export interface DeferralReasonOption {
+  code: DeferralReason;
+  label: string;
+  deferral_days: number | null;
+}
 
 /** A pledge after a change, with the effect on its request. */
 export interface PledgeResult {
@@ -198,6 +230,7 @@ export interface PledgeResult {
   resolved_at: string | null;
   request_status: RequestStatus;
   units_remaining: number;
+  standby_places_left: number;
 }
 
 /**
@@ -219,6 +252,8 @@ export interface HospitalPledge {
   status: PledgeStatus;
   pledged_at: string;
   resolved_at: string | null;
+  /** Set for a deferred pledge; seen only by the hospital that recorded it. */
+  deferral_reason: DeferralReason | null;
   donor: PledgedDonor;
 }
 
@@ -232,6 +267,8 @@ export interface HospitalSummary {
   contact_phone: string;
   latitude: number;
   longitude: number;
+  /** The facility's NIPOST building postcode, when it gave one. */
+  postcode: string | null;
 }
 
 /** The request a donor's pledge is for. */
@@ -251,6 +288,8 @@ export interface DonorPledge {
   status: PledgeStatus;
   pledged_at: string;
   resolved_at: string | null;
+  /** For a deferral, what the donor is told. Never the reason itself. */
+  outcome_message: string | null;
   request: DonorRequestSummary;
   hospital: HospitalSummary;
 }
@@ -272,10 +311,14 @@ export interface OpenRequestForDonor {
   urgency: RequestUrgency;
   deadline: string;
   notes: string | null;
+  /** Units still free. Zero when only standby places are left. */
   units_remaining: number;
+  standby_places_left: number;
   distance_km: number;
   hospital: HospitalSummary;
   my_pledge_id: string | null;
+  /** Whether the donor's pledge takes a unit or waits in reserve. */
+  my_pledge_status: "pledged" | "standby" | null;
 }
 
 /** The open requests a donor can answer, and the radius searched. */
@@ -323,4 +366,129 @@ export interface HospitalStats {
   no_show_rate: number | null;
   units_donated: number;
   donors_alerted: number;
+}
+
+/** Which dataset answered a postcode question: the built-in samples, the NIPOST sandbox or live data. */
+export type PostcodeSource = "mock" | "test" | "live";
+
+/** What BloodLink knows about one postcode, after checking it with NIPOST. */
+export interface PostcodeCheck {
+  postcode: string;
+  /** True when NIPOST has assigned the postcode to a building. */
+  valid: boolean;
+  /** The postcode without its building unit: all a donor's profile keeps. */
+  area_code: string;
+  state_code: string;
+  lga_code: string;
+  state_name: string | null;
+  lga_name: string | null;
+  locality_name: string | null;
+  source: PostcodeSource;
+}
+
+/** The building nearest to a map position, found with NIPOST reverse search. */
+export interface PostcodeAt {
+  found: boolean;
+  postcode: string | null;
+  distance_m: number | null;
+  source: PostcodeSource;
+}
+
+/** How closely a donor's postcode agrees with a hospital's, from the closest to the widest. */
+export type PostcodeRing = "area" | "district" | "lga" | "state";
+
+/** What NIPOST records about a hospital's building, for an administrator reviewing it. */
+export interface PostcodeRecord {
+  postcode: string;
+  valid: boolean;
+  /** The lookup level NIPOST answered at. Fields beyond it are empty. */
+  level: number;
+  state_name: string | null;
+  lga_name: string | null;
+  locality_name: string | null;
+  house_address: string | null;
+  building_use_status: string | null;
+  source: PostcodeSource;
+}
+
+/** Reachable donors in one postcode ring around the hospital. Counts only. */
+export interface RingCoverage {
+  ring: PostcodeRing;
+  /** The postcode segments the ring covers, for example `FC-01` for the LGA. */
+  prefix: string;
+  name: string | null;
+  /** Donors in the ring, counting the narrower rings inside it. */
+  total: number;
+  by_group: Partial<Record<BloodGroup, number>>;
+}
+
+/** The donors a hospital can reach, by postcode ring and blood group. */
+export interface Coverage {
+  postcode: string | null;
+  rings: RingCoverage[];
+  without_postcode_nearby: number;
+  radius_km: number;
+}
+
+/** A verified hospital, as anyone looking for one can see it. */
+export interface PublicHospital {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  state: string;
+  postcode: string | null;
+  contact_phone: string;
+  latitude: number;
+  longitude: number;
+  /** From the position searched from, when one was given. */
+  distance_km: number | null;
+  /** How close its postcode is to the one searched with. */
+  postcode_ring: PostcodeRing | null;
+}
+
+/** Where a family's appeal stands with the hospital. */
+export type FamilyRequestStatus = "pending" | "approved" | "declined";
+
+/** The answer to a family who has just sent an appeal. */
+export interface FamilyRequestCreated {
+  id: string;
+  status: FamilyRequestStatus;
+  hospital_name: string;
+}
+
+/** What a family sees when following their appeal. Nothing personal. */
+export interface FamilyRequestTracking {
+  id: string;
+  status: FamilyRequestStatus;
+  hospital_name: string;
+  hospital_postcode: string | null;
+  hospital_phone: string;
+  recipient_group: BloodGroup;
+  component_name: string;
+  units_needed: number;
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+  /** The blood request raised from the appeal, once approved. */
+  request_status: RequestStatus | null;
+  units_pledged: number | null;
+}
+
+/** A family's appeal as the hospital's staff see it. */
+export interface FamilyRequest {
+  id: string;
+  requester_name: string;
+  requester_phone: string;
+  recipient_group: BloodGroup;
+  component_code: string;
+  component_name: string;
+  units_needed: number;
+  ward_reference: string;
+  notes: string | null;
+  status: FamilyRequestStatus;
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+  blood_request_id: string | null;
 }

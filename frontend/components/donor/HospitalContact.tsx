@@ -17,6 +17,12 @@ export function HospitalContact({ hospital }: { hospital: HospitalSummary }) {
         <MapPin className="mt-0.5 size-4 shrink-0 text-ink-muted" aria-hidden="true" />
         <span>
           {hospital.address}, {placeName(hospital.city, hospital.state)}
+          {hospital.postcode ? (
+            <>
+              {" · "}
+              <span className="font-medium">Postcode {hospital.postcode}</span>
+            </>
+          ) : null}
         </span>
       </p>
       <p className="flex flex-wrap items-center gap-x-4 gap-y-2">

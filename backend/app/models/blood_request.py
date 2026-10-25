@@ -27,6 +27,8 @@ class BloodRequest(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
             from the ``blood_compatibility`` table.
         component_type_id: Which component is required (whole blood, platelets, ...).
         units_needed: Number of units still required, at least one.
+        standby_units: Extra donors accepted in reserve once every unit is pledged, because
+            some donors are turned away at screening or do not come.
         urgency: Priority shown to donors and used to order alerts.
         deadline: Moment after which the request stops accepting pledges.
         notes: Optional free-text context for donors (ward, contact desk, and so on).
@@ -37,6 +39,7 @@ class BloodRequest(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
     __tablename__ = "blood_requests"
     __table_args__ = (
         CheckConstraint("units_needed > 0", name="units_positive"),
+        CheckConstraint("standby_units >= 0", name="standby_units_not_negative"),
         # Supports the donor-facing list of open requests ordered by deadline.
         Index("ix_blood_requests_status_deadline", "status", "deadline"),
         # Supports a hospital's own dashboard filtered by lifecycle state.
@@ -50,6 +53,7 @@ class BloodRequest(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
     )
     component_type_id: UUID = Field(foreign_key="component_types.id", ondelete="RESTRICT")
     units_needed: int
+    standby_units: int = Field(default=0, sa_column_kwargs={"server_default": "0"})
     urgency: RequestUrgency = Field(sa_type=enum_column_type(RequestUrgency, "urgency"))
     deadline: datetime = Field(sa_type=DateTime(timezone=True))
     notes: str | None = Field(default=None, max_length=1000)

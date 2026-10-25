@@ -7,6 +7,7 @@ facility can never see or change another facility's record.
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import ClientIp, SessionDep, StaffUser
+from app.api.routes.postcodes import PostcodeClientDep, require_assigned_postcode
 from app.schemas.hospital import HospitalRead, HospitalWrite
 from app.services.hospitals import (
     AlreadyHasHospitalError,
@@ -30,13 +31,18 @@ _NO_HOSPITAL = "You have not registered a hospital yet."
     responses={status.HTTP_409_CONFLICT: {"description": "Already registered a hospital"}},
 )
 def register_my_hospital(
-    payload: HospitalWrite, user: StaffUser, session: SessionDep, ip_address: ClientIp
+    payload: HospitalWrite,
+    user: StaffUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    postcodes: PostcodeClientDep,
 ) -> HospitalRead:
     """Register a hospital and link the signed-in staff member to it.
 
     The hospital starts as ``pending``. It cannot raise blood requests until an
-    administrator verifies it.
+    administrator verifies it. A postcode, if given, must be one NIPOST has assigned.
     """
+    require_assigned_postcode(postcodes, payload.postcode)
     try:
         hospital = register_hospital(session, user, payload, ip_address=ip_address)
     except AlreadyHasHospitalError:
@@ -71,12 +77,18 @@ def read_my_hospital(user: StaffUser, session: SessionDep) -> HospitalRead:
     },
 )
 def update_my_hospital(
-    payload: HospitalWrite, user: StaffUser, session: SessionDep, ip_address: ClientIp
+    payload: HospitalWrite,
+    user: StaffUser,
+    session: SessionDep,
+    ip_address: ClientIp,
+    postcodes: PostcodeClientDep,
 ) -> HospitalRead:
     """Correct the hospital's details while it is pending or after a rejection.
 
-    Editing a rejected hospital sends it back to ``pending`` for another review.
+    Editing a rejected hospital sends it back to ``pending`` for another review. A
+    postcode, if given, must be one NIPOST has assigned.
     """
+    require_assigned_postcode(postcodes, payload.postcode)
     try:
         hospital = update_hospital(session, user, payload, ip_address=ip_address)
     except HospitalNotFoundError:

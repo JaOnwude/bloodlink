@@ -25,6 +25,10 @@ class Donor(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
         latitude: Approximate latitude used for distance ranking.
         longitude: Approximate longitude used for distance ranking.
         city: City or town shown to hospital staff after a donor pledges.
+        postcode_area: The donor's NIPOST postcode without its building unit, for example
+            ``FC-01-A01-KP``. It places the donor in an area, district, LGA and state for
+            matching and coverage, but never identifies their building: the full postcode
+            is checked with NIPOST when given and then cut back to this before it is saved.
         last_donation_date: Cached date of the most recent confirmed donation. It is
             updated in the same transaction that records the donation, so eligibility
             checks need not scan the full donation history.
@@ -50,6 +54,7 @@ class Donor(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
     latitude: float
     longitude: float
     city: str = Field(max_length=100)
+    postcode_area: str | None = Field(default=None, max_length=12, index=True)
     last_donation_date: date | None = Field(default=None)
     is_available: bool = Field(default=True, sa_column_kwargs={"server_default": true()})
     consent_to_contact: bool = Field(

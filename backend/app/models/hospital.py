@@ -27,6 +27,9 @@ class Hospital(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
         state: Nigerian state (or equivalent administrative region).
         latitude: WGS84 latitude of the facility, used as the origin for donor searches.
         longitude: WGS84 longitude of the facility.
+        postcode: The facility's NIPOST building postcode, for example ``FC-01-A01-KP-27``,
+            checked with NIPOST before it is saved. A hospital is a public place, so its full
+            postcode is shown to donors and families.
         registration_number: Regulator-issued registration or licence number.
         contact_phone: Switchboard or blood bank desk number.
         verification_status: Current state of the administrative review.
@@ -46,6 +49,7 @@ class Hospital(UUIDPrimaryKeyMixin, TimestampMixin, table=True):
     state: str = Field(max_length=100)
     latitude: float
     longitude: float
+    postcode: str | None = Field(default=None, max_length=15, index=True)
     registration_number: str | None = Field(default=None, max_length=100)
     contact_phone: str = Field(max_length=32)
     verification_status: VerificationStatus = Field(

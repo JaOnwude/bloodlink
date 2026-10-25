@@ -14,6 +14,7 @@ from pydantic import (
 )
 
 from app.models.enums import BloodGroup, Sex
+from app.schemas.common import OptionalPostcode
 
 # Dates typed by people in Nigeria (UTC+1) can be a day ahead of the server's UTC date for
 # a short time around midnight. Allowing one day of slack stops "today" being rejected as
@@ -39,6 +40,9 @@ class DonorWrite(BaseModel):
         latitude: Approximate latitude used to rank nearby requests.
         longitude: Approximate longitude.
         city: Shown to hospital staff once the donor pledges.
+        postcode: The full NIPOST postcode of the donor's home or workplace. It must be one
+            NIPOST has assigned, and only its area part is kept (see ``Donor.postcode_area``).
+            Leave the field out to keep the area saved before; send null to remove it.
         last_donation_date: When the donor last gave blood, as they remember it. It is
             self-declared until a hospital confirms a donation, and final eligibility is
             always decided clinically at the donation site.
@@ -54,6 +58,7 @@ class DonorWrite(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     city: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    postcode: OptionalPostcode = None
     last_donation_date: date | None = None
     is_available: bool = True
     consent_to_contact: bool = False
@@ -101,6 +106,7 @@ class DonorRead(BaseModel):
     latitude: float
     longitude: float
     city: str
+    postcode_area: str | None
     last_donation_date: date | None
     is_available: bool
     consent_to_contact: bool
