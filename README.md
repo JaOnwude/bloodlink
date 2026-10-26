@@ -379,7 +379,9 @@ with a warning.
 To bring a demonstration seeded before a feature existed up to date (sample postcodes, a
 fresh open request, and `DEMO_DONOR_PHONE` given to the first matching donor), run
 `uv run python -m scripts.refresh_demo`. It touches only demonstration accounts and can be
-run any number of times.
+run any number of times. `DEMO_PASSWORD` is only read when the demonstration accounts are
+created; after changing it, add `--reset-passwords` to move every demonstration account to
+the new value.
 
 ### Text messages
 
