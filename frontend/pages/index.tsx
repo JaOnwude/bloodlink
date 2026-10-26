@@ -48,7 +48,7 @@ import { Faq } from "@/components/landing/Faq";
 import type { FaqItem } from "@/components/landing/Faq";
 import { HeroBackdrop } from "@/components/landing/HeroBackdrop";
 import { HeroCards } from "@/components/landing/HeroCards";
-import { PhotoCarousel } from "@/components/landing/PhotoCarousel";
+import { PhotoCards } from "@/components/landing/PhotoCards";
 import { PostcodeAnatomy } from "@/components/landing/PostcodeAnatomy";
 import { Pricing } from "@/components/landing/Pricing";
 import { Reveal } from "@/components/motion/Reveal";
@@ -374,8 +374,8 @@ export default function HomePage() {
           </Reveal>
           <StepList points={STEPS} ring="ring-surface" />
           <Reveal className="pt-2">
-            <PhotoCarousel slides={carouselSlides} label="BloodLink at work" />
-            <p className="mt-3 text-xs text-ink-muted">
+            <PhotoCards slides={carouselSlides} />
+            <p className="mt-4 text-xs text-ink-muted">
               Photographs from Pexels by{" "}
               {carouselSlides.map((slide) => slide.image.credit?.author).join(", ")}. The people
               shown are not BloodLink donors, patients or staff.
@@ -521,7 +521,7 @@ export default function HomePage() {
       </Section>
 
       {/* Closing call to action. */}
-      <section className="bg-[linear-gradient(120deg,var(--color-primary-700),var(--color-night)_70%)] py-section text-white">
+      <section className="bg-primary-700 py-section text-white">
         <Container size="reading" className="text-center">
           <Reveal>
             <h2 className="text-title font-semibold text-white">
