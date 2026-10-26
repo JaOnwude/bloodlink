@@ -16,31 +16,15 @@
 
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 import Image from "next/image";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import type { CarouselSlide } from "@/lib/images";
+import { usePrefersReducedMotion } from "@/lib/use-prefers-reduced-motion";
 import { cn } from "@/lib/utils";
 
 /** How long each slide stays in view while playing, in milliseconds. */
 const SLIDE_INTERVAL_MS = 7000;
-
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-function subscribeToMotionPreference(onChange: () => void) {
-  const query = window.matchMedia(REDUCED_MOTION);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-/** Whether the visitor asked for reduced motion. False while rendering on the server. */
-function usePrefersReducedMotion(): boolean {
-  return useSyncExternalStore(
-    subscribeToMotionPreference,
-    () => window.matchMedia(REDUCED_MOTION).matches,
-    () => false,
-  );
-}
 
 export function PhotoCarousel({ slides, label }: { slides: CarouselSlide[]; label: string }) {
   const [index, setIndex] = useState(0);

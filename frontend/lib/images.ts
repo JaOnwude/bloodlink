@@ -134,3 +134,64 @@ export const carouselSlides: CarouselSlide[] = [
     body: "Every hospital is checked before it can contact a donor, so every alert is real.",
   },
 ];
+
+/**
+ * The photographs that cross-fade behind the landing page headline, in story order: a nurse
+ * prepares a donor's arm, blood is drawn, a donation is under way, the units are bagged and
+ * labelled by group, and a sample goes to the laboratory. Each was checked by eye against its
+ * description. They sit behind a dark overlay, so they are decorative (empty `alt`); the
+ * headline carries the meaning. The people shown are models, not BloodLink users, and the
+ * hero says so.
+ */
+export const heroPhotos: SiteImage[] = [
+  {
+    src: pexels(8460349, 1920),
+    alt: "",
+    objectPosition: "60% 40%",
+    credit: {
+      author: "Los Muertos Crew",
+      source: "Pexels",
+      url: "https://www.pexels.com/photo/nurse-wiping-the-arm-of-a-patient-8460349/",
+    },
+  },
+  {
+    src: pexels(35645524, 1920),
+    alt: "",
+    objectPosition: "60% 50%",
+    credit: {
+      author: "Sahil Singh",
+      source: "Pexels",
+      url: "https://www.pexels.com/photo/phlebotomy-procedure-in-medical-clinic-35645524/",
+    },
+  },
+  {
+    src: pexels(37553398, 1920),
+    alt: "",
+    objectPosition: "60% 50%",
+    credit: {
+      author: "Tahir Xəlfəquliyev",
+      source: "Pexels",
+      url: "https://www.pexels.com/photo/healthcare-professional-conducting-blood-donation-37553398/",
+    },
+  },
+  {
+    src: pexels(4531304, 1920),
+    alt: "",
+    objectPosition: "50% 50%",
+    credit: {
+      author: "Charlie-Helen Robinson",
+      source: "Pexels",
+      url: "https://www.pexels.com/photo/bags-of-blood-4531304/",
+    },
+  },
+  {
+    src: pexels(8460346, 1920),
+    alt: "",
+    objectPosition: "55% 45%",
+    credit: {
+      author: "Los Muertos Crew",
+      source: "Pexels",
+      url: "https://www.pexels.com/photo/person-holding-a-blood-sample-in-a-test-tube-8460346/",
+    },
+  },
+];
