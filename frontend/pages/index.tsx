@@ -32,16 +32,25 @@ import type { ReactNode } from "react";
 import { Container } from "@/components/layout/Container";
 import { Section } from "@/components/layout/Section";
 import { SectionHeading } from "@/components/layout/SectionHeading";
+import { HeroBackdrop } from "@/components/landing/HeroBackdrop";
+import { HeroCards } from "@/components/landing/HeroCards";
 import { PhotoCarousel } from "@/components/landing/PhotoCarousel";
 import { Pricing } from "@/components/landing/Pricing";
-import { ProductPreview } from "@/components/landing/ProductPreview";
 import { Reveal } from "@/components/motion/Reveal";
 import { buttonVariants } from "@/components/ui/button";
-import { carouselSlides } from "@/lib/images";
+import { carouselSlides, heroPhotos } from "@/lib/images";
 import { siteConfig } from "@/lib/site";
+import { cn } from "@/lib/utils";
 
 const REGISTER_HOSPITAL = "/register?as=hospital";
 const REGISTER_DONOR = "/register?as=donor";
+
+/** Short trust signals above the headline. */
+const HERO_BADGES = [
+  { icon: <ShieldCheck className="size-3.5" aria-hidden="true" />, label: "Verified hospitals only" },
+  { icon: <MapPinned className="size-3.5" aria-hidden="true" />, label: "Built on Nigeria's postcode" },
+  { icon: <HandHeart className="size-3.5" aria-hidden="true" />, label: "Always free for donors" },
+];
 
 interface Point {
   icon: ReactNode;
@@ -137,38 +146,66 @@ export default function HomePage() {
         <meta name="description" content={siteConfig.description} />
       </Head>
 
-      {/* Hero: the hospital's problem, in one line. */}
-      <Section>
-        <Container className="grid items-center gap-14 xl:grid-cols-[1.1fr_1fr]">
+      {/* Hero: the hospital's problem in one line, over photos of blood being given. */}
+      <section className="relative isolate overflow-hidden">
+        <HeroBackdrop photos={heroPhotos} />
+        <Container className="grid min-h-[calc(100svh-4.5rem)] items-center gap-12 py-20 lg:grid-cols-[1.25fr_1fr] lg:py-24">
           <Reveal>
-            <p className="mb-4 text-sm font-semibold tracking-wider text-primary-600 uppercase">
+            <ul className="mb-7 flex flex-wrap gap-2" aria-label="Why hospitals trust BloodLink">
+              {HERO_BADGES.map((badge) => (
+                <li
+                  key={badge.label}
+                  className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/20 backdrop-blur"
+                >
+                  {badge.icon}
+                  {badge.label}
+                </li>
+              ))}
+            </ul>
+            <p className="mb-4 text-sm font-semibold tracking-wider text-primary-100 uppercase">
               For hospitals and blood banks
             </p>
-            {/* Full display size while stacked; one step down once it shares the row. */}
-            <h1 className="max-w-3xl text-display font-semibold text-ink xl:text-title">
-              When a hospital needs O-negative tonight, find donors who can actually give.
+            <h1 className="max-w-3xl text-display font-semibold text-white lg:text-[3.25rem] lg:leading-[1.08] xl:text-[3.75rem]">
+              When a hospital needs O-negative tonight,{" "}
+              <span className="text-primary-500">find donors who can actually give.</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lead text-ink-muted">
-              BloodLink texts compatible, eligible donors near your hospital, tracks every
-              pledge, and closes the request the moment you have enough.
+            <p className="mt-6 max-w-xl text-lead text-white/80">
+              BloodLink texts compatible, eligible donors near your hospital, starting in your
+              own postcode area, tracks every pledge, and closes the request the moment you
+              have enough.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3">
+            <div className="mt-9 flex flex-wrap items-center gap-3">
               <Link href={REGISTER_HOSPITAL} className={buttonVariants({ size: "xl" })}>
                 Register your hospital
               </Link>
-              <Link href={REGISTER_DONOR} className={buttonVariants({ variant: "outline", size: "xl" })}>
-                Become a donor
+              <Link
+                href="/find-blood"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "xl" }),
+                  "border-white/70 text-white hover:bg-white hover:text-ink",
+                )}
+              >
+                Need blood for a patient?
               </Link>
             </div>
-            <p className="mt-5 text-sm text-ink-muted">
-              Free for pilot hospitals. Always free for donors.
+            <p className="mt-6 text-sm text-white/70">
+              Free for pilot hospitals. Always free for donors.{" "}
+              <Link
+                href={REGISTER_DONOR}
+                className="font-medium text-white underline-offset-4 hover:underline"
+              >
+                Become a donor
+              </Link>
             </p>
           </Reveal>
-          <Reveal delay={120}>
-            <ProductPreview />
+          <Reveal delay={160} className="hidden lg:block">
+            <HeroCards />
           </Reveal>
         </Container>
-      </Section>
+        <p className="absolute right-5 bottom-5 hidden text-[11px] text-white/50 sm:block">
+          Photos: Pexels. The people shown are models, not BloodLink users.
+        </p>
+      </section>
 
       {/* The problem today. */}
       <Section tone="night">
