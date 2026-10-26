@@ -1,25 +1,36 @@
 /**
- * Landing page: the pitch to hospitals first, and the invitation to donors second.
+ * Landing page: the pitch to hospitals first, then families and donors.
  *
  * Hospitals and blood banks are the paying customers, so the page opens with their problem
- * and what BloodLink does about it, then why they can trust it and what it costs. Donors,
- * who always use BloodLink free, are recruited in their own section further down.
+ * and what BloodLink does about it. It then shows what sets BloodLink apart (Nigeria's
+ * digital postcode), how a family can ask for blood, why it can be trusted, what it costs,
+ * the invitation to donors, and common questions.
+ *
+ * Sections alternate in tone (light, white, dark, tinted) so the page has a rhythm, and
+ * every section uses the same heading component so the hierarchy stays consistent.
  *
  * Claims about the scale of the problem are written without figures on purpose. Numbers go
- * here only once they have been checked and cited in the project research notes.
+ * here only once they have been checked and cited in the project research notes; the facts
+ * strip states properties of the product, not usage.
  *
  * The page is written for newcomers. Signed-in visitors can still read it, and reach their
  * own dashboard from the link in the site header.
  */
 
 import {
+  BadgeCheck,
   BellRing,
+  Building2,
   ClipboardCheck,
+  ClipboardList,
   HandHeart,
   HeartHandshake,
   MapPinned,
   MessageCircleWarning,
+  MessageSquareText,
   PhoneOff,
+  Radar,
+  Search,
   ShieldCheck,
   Timer,
   UserCheck,
@@ -32,9 +43,13 @@ import type { ReactNode } from "react";
 import { Container } from "@/components/layout/Container";
 import { Section } from "@/components/layout/Section";
 import { SectionHeading } from "@/components/layout/SectionHeading";
+import { FactStrip } from "@/components/landing/FactStrip";
+import { Faq } from "@/components/landing/Faq";
+import type { FaqItem } from "@/components/landing/Faq";
 import { HeroBackdrop } from "@/components/landing/HeroBackdrop";
 import { HeroCards } from "@/components/landing/HeroCards";
 import { PhotoCarousel } from "@/components/landing/PhotoCarousel";
+import { PostcodeAnatomy } from "@/components/landing/PostcodeAnatomy";
 import { Pricing } from "@/components/landing/Pricing";
 import { Reveal } from "@/components/motion/Reveal";
 import { buttonVariants } from "@/components/ui/button";
@@ -78,24 +93,65 @@ const PROBLEMS: Point[] = [
 
 const STEPS: Point[] = [
   {
-    icon: <ClipboardCheck className="size-6" aria-hidden="true" />,
+    icon: <ClipboardCheck className="size-5" aria-hidden="true" />,
     title: "A verified hospital raises a request",
     body: "Blood group, component, units and deadline. Only hospitals checked by our team can send one.",
   },
   {
-    icon: <BellRing className="size-6" aria-hidden="true" />,
+    icon: <BellRing className="size-5" aria-hidden="true" />,
     title: "The right donors are texted",
-    body: "Compatible, eligible today, available and nearby, nearest first. Nobody is texted twice about the same request.",
+    body: "Compatible, eligible today and available, starting in the hospital's own postcode area. Nobody is texted twice about the same request.",
   },
   {
-    icon: <HeartHandshake className="size-6" aria-hidden="true" />,
+    icon: <HeartHandshake className="size-5" aria-hidden="true" />,
     title: "Donors pledge, and it never overbooks",
     body: "Each pledge takes one unit. When the last unit is taken the request closes itself, even if two donors answer at once.",
   },
   {
-    icon: <UserCheck className="size-6" aria-hidden="true" />,
+    icon: <UserCheck className="size-5" aria-hidden="true" />,
     title: "You confirm who gave",
-    body: "Mark each donor as donated or did not attend. Their waiting period starts, and your figures stay honest.",
+    body: "Mark each donor as donated, did not attend or deferred at screening. Their waiting period starts, and your figures stay honest.",
+  },
+];
+
+const POSTCODE_FEATURES: Point[] = [
+  {
+    icon: <BadgeCheck className="size-5" aria-hidden="true" />,
+    title: "Checked with NIPOST at sign-up",
+    body: "Hospitals and donors add their postcode by typing it or from their location, and NIPOST confirms it is a real, assigned building.",
+  },
+  {
+    icon: <Radar className="size-5" aria-hidden="true" />,
+    title: "Alerts in postcode rings",
+    body: "Donors in the hospital's own postcode area hear first, then its district, LGA and state.",
+  },
+  {
+    icon: <MessageSquareText className="size-5" aria-hidden="true" />,
+    title: "The postcode in every text",
+    body: "Each alert carries the hospital's postcode, so a donor on a basic phone can find the building.",
+  },
+  {
+    icon: <Building2 className="size-5" aria-hidden="true" />,
+    title: "Hospitals verified against NIPOST",
+    body: "Before a hospital can alert anyone, an administrator compares it with NIPOST's record of the building.",
+  },
+];
+
+const FAMILY_STEPS: Point[] = [
+  {
+    icon: <Search className="size-5" aria-hidden="true" />,
+    title: "Find the hospital",
+    body: "Search by the hospital's postcode or your location. Only hospitals we have verified are listed.",
+  },
+  {
+    icon: <ClipboardList className="size-5" aria-hidden="true" />,
+    title: "Tell it what is needed",
+    body: "The blood group, the units and the ward or lab slip number from the doctor.",
+  },
+  {
+    icon: <BellRing className="size-5" aria-hidden="true" />,
+    title: "The hospital confirms, donors are alerted",
+    body: "Once staff confirm your patient, nearby donors are texted. You follow it on your own page and get a text.",
   },
 ];
 
@@ -113,7 +169,7 @@ const TRUST: Point[] = [
   {
     icon: <MapPinned className="size-6" aria-hidden="true" />,
     title: "Donor privacy by default",
-    body: "Hospitals see a donor's name and number only after that donor pledges. On the map, donors are shown to the nearest kilometre.",
+    body: "Hospitals see a donor's name and number only after that donor pledges. A donor's postcode is kept to the area, never the building.",
   },
   {
     icon: <HandHeart className="size-6" aria-hidden="true" />,
@@ -122,12 +178,56 @@ const TRUST: Point[] = [
   },
 ];
 
-function PointGrid({ points, columns }: { points: Point[]; columns: 3 | 4 }) {
+const FAQS: FaqItem[] = [
+  {
+    question: "Is BloodLink free?",
+    answer:
+      "Always free for donors and for families. Pilot hospitals use it free while we agree prices together. Hospitals will pay for the service, never for blood: donation stays voluntary and unpaid.",
+  },
+  {
+    question: "Who can ask for blood?",
+    answer:
+      "Verified hospitals and blood banks raise requests directly. A patient's family can ask a verified hospital from the Need blood page; the hospital confirms the patient before any donor is alerted.",
+  },
+  {
+    question: "How does BloodLink use Nigeria's digital postcode?",
+    answer:
+      "Postcodes are checked with NIPOST when hospitals and donors add them. Donors are alerted ring by ring from the hospital's own postcode area, alerts carry the hospital's postcode, and administrators compare each hospital with NIPOST's record of its building.",
+  },
+  {
+    question: "What happens to my personal data?",
+    answer:
+      "You choose whether to be contacted. Hospitals see a donor's name and number only after that donor pledges. A donor's postcode is cut back to the area before it is stored. We handle data under the Nigeria Data Protection Act.",
+  },
+  {
+    question: "Does BloodLink decide if I can donate?",
+    answer:
+      "No. It checks waiting periods, age, weight and deferrals so you are only asked when you are likely able to give, but clinical staff at the donation site always make the final decision.",
+  },
+  {
+    question: "What if a donor does not turn up?",
+    answer:
+      "Hospitals can ask for standby donors. If a pledged donor cancels, does not come or is turned away at screening, the longest-waiting standby donor is called in and texted automatically.",
+  },
+];
+
+/** Cards with an icon, for lists of reasons (the problem, why it can be trusted). */
+function CardGrid({ points, columns }: { points: Point[]; columns: 3 | 4 }) {
   return (
-    <ul className={`grid gap-6 sm:grid-cols-2 ${columns === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+    <ul
+      className={cn(
+        "grid gap-5 sm:grid-cols-2",
+        columns === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+      )}
+    >
       {points.map((point, index) => (
-        <Reveal as="li" key={point.title} delay={index * 60} className="space-y-3">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+        <Reveal
+          as="li"
+          key={point.title}
+          delay={index * 60}
+          className="group space-y-3 rounded-3xl border border-border bg-surface p-6 shadow-soft transition-[box-shadow,transform] duration-250 ease-brand hover:-translate-y-1 hover:shadow-lift"
+        >
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 transition-colors group-hover:bg-primary-600 group-hover:text-white">
             {point.icon}
           </span>
           <h3 className="font-heading text-lg font-semibold text-ink">{point.title}</h3>
@@ -135,6 +235,46 @@ function PointGrid({ points, columns }: { points: Point[]; columns: 3 | 4 }) {
         </Reveal>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Numbered steps joined by a line, for anything that happens in order.
+ *
+ * `ring` is the colour of the gap drawn around each number so the line appears to pass
+ * behind it; it must match the section's background.
+ */
+function StepList({ points, ring }: { points: Point[]; ring: string }) {
+  return (
+    <ol
+      className={cn(
+        "relative grid gap-8 sm:grid-cols-2",
+        points.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+      )}
+    >
+      {/* The line behind the numbers, on wide screens where the steps share one row. */}
+      <span
+        className="absolute top-6 right-[10%] left-6 hidden h-px bg-primary-100 lg:block"
+        aria-hidden="true"
+      />
+      {points.map((point, index) => (
+        <Reveal as="li" key={point.title} delay={index * 80} className="relative space-y-3">
+          <span
+            className={cn(
+              "relative flex size-12 items-center justify-center rounded-full bg-primary-600 font-heading text-lg font-semibold text-white shadow-lift ring-8",
+              ring,
+            )}
+          >
+            {index + 1}
+          </span>
+          <h3 className="flex items-start gap-2 font-heading text-lg font-semibold text-ink">
+            <span className="mt-1 text-primary-600">{point.icon}</span>
+            {point.title}
+          </h3>
+          <p className="text-ink-muted">{point.body}</p>
+        </Reveal>
+      ))}
+    </ol>
   );
 }
 
@@ -207,34 +347,24 @@ export default function HomePage() {
         </p>
       </section>
 
+      <FactStrip />
+
       {/* The problem today. */}
-      <Section tone="night">
+      <Section>
         <Container className="space-y-12">
-          <Reveal className="max-w-2xl">
-            <p className="mb-3 text-sm font-semibold tracking-wider text-primary-100 uppercase">
-              The problem
-            </p>
-            <h2 className="text-title font-semibold text-ivory">
-              Finding blood in an emergency still depends on who you can reach.
-            </h2>
+          <Reveal>
+            <SectionHeading
+              eyebrow="The problem"
+              title="Finding blood in an emergency still depends on who you can reach."
+            />
           </Reveal>
-          <ul className="grid gap-8 md:grid-cols-3">
-            {PROBLEMS.map((point, index) => (
-              <Reveal as="li" key={point.title} delay={index * 60} className="space-y-3">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-ivory/10 text-primary-100">
-                  {point.icon}
-                </span>
-                <h3 className="font-heading text-lg font-semibold text-ivory">{point.title}</h3>
-                <p className="text-ivory/75">{point.body}</p>
-              </Reveal>
-            ))}
-          </ul>
+          <CardGrid points={PROBLEMS} columns={3} />
         </Container>
       </Section>
 
       {/* How it works. */}
-      <Section id="how-it-works">
-        <Container className="space-y-12">
+      <Section tone="surface" id="how-it-works">
+        <Container className="space-y-14">
           <Reveal>
             <SectionHeading
               eyebrow="How it works"
@@ -242,15 +372,66 @@ export default function HomePage() {
               lead="Every step a hospital takes today by phone, BloodLink does in a few clicks, and keeps a record of."
             />
           </Reveal>
-          <PointGrid points={STEPS} columns={4} />
-          <Reveal className="pt-4">
+          <StepList points={STEPS} ring="ring-surface" />
+          <Reveal className="pt-2">
             <PhotoCarousel slides={carouselSlides} label="BloodLink at work" />
             <p className="mt-3 text-xs text-ink-muted">
               Photographs from Pexels by{" "}
-              {carouselSlides.map((slide) => slide.image.credit?.author).join(", ")}. The people shown
-              are not BloodLink donors, patients or staff.
+              {carouselSlides.map((slide) => slide.image.credit?.author).join(", ")}. The people
+              shown are not BloodLink donors, patients or staff.
             </p>
           </Reveal>
+        </Container>
+      </Section>
+
+      {/* Nigeria's digital postcode. */}
+      <Section tone="night" id="postcode">
+        <Container className="grid items-center gap-12 lg:grid-cols-[1fr_1.1fr]">
+          <Reveal>
+            <p className="mb-3 text-sm font-semibold tracking-wider text-primary-100 uppercase">
+              Built on Nigeria&apos;s postcode
+            </p>
+            <h2 className="text-title font-semibold text-ivory">
+              Every hospital and donor, placed to the building.
+            </h2>
+            <p className="mt-4 text-lead text-ivory/75">
+              BloodLink uses NIPOST&apos;s digital postcode wherever location matters, so
+              &ldquo;nearby&rdquo; means a real place, not a guess.
+            </p>
+            <ul className="mt-8 space-y-5">
+              {POSTCODE_FEATURES.map((feature) => (
+                <li key={feature.title} className="flex gap-3">
+                  <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-primary-100">
+                    {feature.icon}
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-ivory">{feature.title}</span>
+                    <span className="block text-sm text-ivory/70">{feature.body}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+          <Reveal delay={120}>
+            <PostcodeAnatomy />
+          </Reveal>
+        </Container>
+      </Section>
+
+      {/* Families. */}
+      <Section tone="tint" id="families">
+        <Container className="space-y-12">
+          <Reveal className="flex flex-wrap items-end justify-between gap-6">
+            <SectionHeading
+              eyebrow="For families"
+              title="Searching for blood for someone you love?"
+              lead="Ask the hospital through BloodLink instead of searching alone. No account needed, and nothing to pay."
+            />
+            <Link href="/find-blood" className={buttonVariants({ size: "lg" })}>
+              Find a hospital
+            </Link>
+          </Reveal>
+          <StepList points={FAMILY_STEPS} ring="ring-primary-50" />
         </Container>
       </Section>
 
@@ -264,7 +445,7 @@ export default function HomePage() {
               lead="Existing tools either move stock between blood banks or match people in a chat and stop there. BloodLink is the closed loop in between: verified requests, enforced eligibility, tracked donations."
             />
           </Reveal>
-          <PointGrid points={TRUST} columns={4} />
+          <CardGrid points={TRUST} columns={4} />
         </Container>
       </Section>
 
@@ -311,7 +492,10 @@ export default function HomePage() {
                 "A record of every donation you have given",
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3 text-ink">
-                  <HeartHandshake className="mt-0.5 size-5 shrink-0 text-primary-600" aria-hidden="true" />
+                  <HeartHandshake
+                    className="mt-0.5 size-5 shrink-0 text-primary-600"
+                    aria-hidden="true"
+                  />
                   {item}
                 </li>
               ))}
@@ -320,32 +504,60 @@ export default function HomePage() {
         </Container>
       </Section>
 
+      {/* Questions. */}
+      <Section tone="surface" id="faq">
+        <Container className="grid gap-12 lg:grid-cols-[1fr_1.6fr]">
+          <Reveal>
+            <SectionHeading
+              eyebrow="Questions"
+              title="What people ask us."
+              lead="Something not answered here? Register your hospital and talk to us during the pilot."
+            />
+          </Reveal>
+          <Reveal delay={80}>
+            <Faq items={FAQS} />
+          </Reveal>
+        </Container>
+      </Section>
+
       {/* Closing call to action. */}
-      <Section>
+      <section className="bg-[linear-gradient(120deg,var(--color-primary-700),var(--color-night)_70%)] py-section text-white">
         <Container size="reading" className="text-center">
           <Reveal>
-            <h2 className="text-title font-semibold text-ink">
+            <h2 className="text-title font-semibold text-white">
               The next emergency is already on its way.
             </h2>
-            <p className="mt-4 text-lead text-ink-muted">
+            <p className="mt-4 text-lead text-white/80">
               Register your hospital now. An administrator verifies it, and you can send your
               first request the same day.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link href={REGISTER_HOSPITAL} className={buttonVariants({ size: "xl" })}>
+              <Link
+                href={REGISTER_HOSPITAL}
+                className={cn(
+                  buttonVariants({ size: "xl" }),
+                  "bg-white text-primary-700 hover:bg-primary-50",
+                )}
+              >
                 Register your hospital
               </Link>
-              <Link href={REGISTER_DONOR} className={buttonVariants({ variant: "outline", size: "xl" })}>
-                Become a donor
+              <Link
+                href="/find-blood"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "xl" }),
+                  "border-white/70 text-white hover:bg-white hover:text-ink",
+                )}
+              >
+                Need blood for a patient?
               </Link>
             </div>
-            <p className="mt-6 text-sm text-ink-muted">
+            <p className="mt-6 text-sm text-white/70">
               BloodLink matches and coordinates. It does not perform medical screening: final
               eligibility is always decided by clinical staff at the donation site.
             </p>
           </Reveal>
         </Container>
-      </Section>
+      </section>
     </>
   );
 }
