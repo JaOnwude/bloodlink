@@ -296,6 +296,12 @@ def _sample_area(index: int) -> str:
     return postcode.rsplit("-", 1)[0]
 
 
+def standard_donor_emails() -> list[str]:
+    """The sign-in addresses of every standard demonstration donor, in seeding order."""
+    total = sum(len(groups) for groups in _DONOR_GROUPS.values())
+    return [donor_email(number) for number in range(1, total + 1)]
+
+
 def _create_donors(
     session: Session,
     admin: User,
@@ -303,15 +309,20 @@ def _create_donors(
     *,
     donor_phone: str | None,
     today: date,
+    skip_existing: bool = False,
 ) -> list[tuple[User, Donor]]:
     """Create the donors, city by city, with a few deliberate edge cases.
 
     ``donor01`` is an eligible O- donor in Lagos, the account to sign in with to try
     pledging. Among the rest are donors who gave recently, paused their alerts, did not
     agree to be contacted, or are deferred, so each matching rule has someone to exclude.
+
+    With ``skip_existing``, a donor whose account already exists is left alone and the rest
+    are still created exactly as a full seed would create them. Only the donors created are
+    returned.
     """
     rng = random.Random(_RANDOM_SEED)
-    donors: list[tuple[User, Donor]] = []
+    donors: list[tuple[User, Donor] | None] = []
     number = 0
     for city_name, groups in _DONOR_GROUPS.items():
         city = _CITIES[city_name]
@@ -319,6 +330,22 @@ def _create_donors(
             number += 1
             sex = Sex.MALE if rng.random() < 0.55 else Sex.FEMALE
             full_name = f"{rng.choice(_FIRST_NAMES[sex])} {rng.choice(_LAST_NAMES)}"
+            # Every random draw for this donor is made before deciding whether to create it,
+            # so skipping an existing donor never shifts the values of the ones after it.
+            age_days = rng.randint(19 * 365, 55 * 365)
+            weight_kg = round(rng.uniform(55, 95), 1)
+            # Within roughly eight kilometres of the city centre.
+            latitude = round(city["latitude"] + rng.uniform(-0.07, 0.07), 6)
+            longitude = round(city["longitude"] + rng.uniform(-0.07, 0.07), 6)
+            last_donation_date = (
+                today - timedelta(days=rng.randint(130, 400)) if rng.random() < 0.6 else None
+            )
+            if skip_existing and (
+                session.exec(select(User.id).where(User.email == donor_email(number))).first()
+                is not None
+            ):
+                donors.append(None)
+                continue
             user = create_user(
                 session,
                 email=donor_email(number),
@@ -327,21 +354,17 @@ def _create_donors(
                 role=UserRole.DONOR,
                 phone=donor_phone if number == 1 else None,
             )
-            age_days = rng.randint(19 * 365, 55 * 365)
             donor = Donor(
                 user_id=user.id,
                 blood_group=BloodGroup(group),
                 date_of_birth=today - timedelta(days=age_days),
-                weight_kg=round(rng.uniform(55, 95), 1),
+                weight_kg=weight_kg,
                 sex=sex,
-                # Within roughly eight kilometres of the city centre.
-                latitude=round(city["latitude"] + rng.uniform(-0.07, 0.07), 6),
-                longitude=round(city["longitude"] + rng.uniform(-0.07, 0.07), 6),
+                latitude=latitude,
+                longitude=longitude,
                 city=city_name,
                 postcode_area=_sample_area(index) if city_name == "Abuja" else None,
-                last_donation_date=(
-                    today - timedelta(days=rng.randint(130, 400)) if rng.random() < 0.6 else None
-                ),
+                last_donation_date=last_donation_date,
                 is_available=True,
                 consent_to_contact=True,
             )
@@ -349,31 +372,39 @@ def _create_donors(
             donors.append((user, donor))
     session.commit()
 
-    # Edge cases, chosen by position so they are the same every run.
-    _, gave_recently = donors[4]
-    gave_recently.last_donation_date = today - timedelta(days=30)
-    _, paused = donors[8]
-    paused.is_available = False
-    _, private = donors[9]
-    private.consent_to_contact = False
-    _, deferred = donors[14]
-    session.add_all([gave_recently, paused, private])
-    session.add(
-        DonorDeferral(
-            donor_id=deferred.id,
-            reason="Recent malaria treatment",
-            deferred_until=today + timedelta(days=21),
-            recorded_by=admin.id,
+    def created(position: int) -> Donor | None:
+        pair = donors[position]
+        return pair[1] if pair is not None else None
+
+    # Edge cases, chosen by position so they are the same every run. A donor that already
+    # existed (``skip_existing``) is not changed.
+    if gave_recently := created(4):
+        gave_recently.last_donation_date = today - timedelta(days=30)
+        session.add(gave_recently)
+    if paused := created(8):
+        paused.is_available = False
+        session.add(paused)
+    if private := created(9):
+        private.consent_to_contact = False
+        session.add(private)
+    if deferred := created(14):
+        session.add(
+            DonorDeferral(
+                donor_id=deferred.id,
+                reason="Recent malaria treatment",
+                deferred_until=today + timedelta(days=21),
+                recorded_by=admin.id,
+            )
         )
-    )
     # donor01 is always eligible, whatever the random history gave them.
-    _, first = donors[0]
-    first.last_donation_date = None
-    session.add(first)
+    if first := created(0):
+        first.last_donation_date = None
+        session.add(first)
     session.commit()
-    for _, donor in donors:
+    made = [pair for pair in donors if pair is not None]
+    for _, donor in made:
         session.refresh(donor)
-    return donors
+    return made
 
 
 def _raise(
