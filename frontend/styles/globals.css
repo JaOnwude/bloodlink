@@ -232,3 +232,38 @@
     transform: translateY(16px);
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * 6. Landing hero motion
+ * ----------------------------------------------------------------------------
+ * The photo in view zooms in very slowly while it is shown, and the example cards drift
+ * gently. Both run only for visitors who have not asked for reduced motion.
+ */
+@keyframes hero-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero-zoom {
+    animation: hero-zoom 9s var(--ease-brand) forwards;
+  }
+
+  .hero-float {
+    animation: hero-float 7s ease-in-out infinite;
+  }
+}
