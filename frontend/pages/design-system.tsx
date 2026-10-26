@@ -75,7 +75,8 @@ export default function DesignSystemPage() {
               <Swatch name="ink" className="bg-ink" note="Primary text" />
               <Swatch name="ink-muted" className="bg-ink-muted" note="Secondary text" />
               <Swatch name="ivory" className="bg-ivory" note="Text on dark" />
-              <Swatch name="night" className="bg-night" note="Dark sections" />
+              <Swatch name="night" className="bg-night" note="Behind hero photos" />
+              <Swatch name="dusk" className="bg-dusk" note="Dark sections and footer" />
             </SwatchGrid>
           </div>
 
@@ -110,7 +111,7 @@ export default function DesignSystemPage() {
           <h2 className="font-heading text-heading font-semibold text-ink">Typography</h2>
           <div className="space-y-6">
             <div>
-              <p className="mb-1 text-xs text-ink-muted">text-display (Fraunces)</p>
+              <p className="mb-1 text-xs text-ink-muted">text-display (Plus Jakarta Sans)</p>
               <p className="font-heading text-display font-semibold text-ink">Find donors who can give</p>
             </div>
             <div>

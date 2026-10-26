@@ -115,7 +115,8 @@
   /* The font variables are set on :root by pages/_app.tsx from next/font. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     sans-serif;
-  --font-heading: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-heading: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -130,6 +131,8 @@
   --color-ink-muted: #5a6270;
   --color-ivory: #f6efe9;
   --color-night: #1b0f13;
+  /* Dark sections and the footer: lighter than night, which stays behind the hero photos. */
+  --color-dusk: #3a2b33;
 
   /* Brand crimson. 600 is the button colour and passes AA with white text. */
   --color-primary-50: #fdecee;
@@ -200,7 +203,7 @@
   h3,
   h4 {
     @apply font-heading text-balance;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 
   ::selection {
