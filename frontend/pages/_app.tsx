@@ -9,14 +9,14 @@
  */
 
 import type { AppProps } from "next/app";
-import { Fraunces, Inter } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 
 import { Layout } from "@/components/Layout";
 import { AuthProvider } from "@/context/AuthContext";
 import "@/styles/globals.css";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
-const fraunces = Fraunces({ subsets: ["latin"], display: "swap" });
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap" });
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -24,7 +24,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <style jsx global>{`
         :root {
           --font-inter: ${inter.style.fontFamily};
-          --font-fraunces: ${fraunces.style.fontFamily};
+          --font-jakarta: ${jakarta.style.fontFamily};
         }
       `}</style>
       <AuthProvider>

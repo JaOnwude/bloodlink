@@ -34,7 +34,9 @@ export const siteConfig = {
       title: "Hospitals",
       links: [
         { label: "How it works", href: "/#how-it-works" },
+        { label: "Built on Nigeria's postcode", href: "/#postcode" },
         { label: "Pricing", href: "/#pricing" },
+        { label: "Questions", href: "/#faq" },
         { label: "Register your hospital", href: "/register?as=hospital" },
       ],
     },

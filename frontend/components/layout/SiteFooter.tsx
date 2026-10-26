@@ -14,7 +14,7 @@ export function SiteFooter() {
   const groups = siteConfig.footerGroups.filter((group) => group.links.length > 0);
 
   return (
-    <footer className="bg-night text-ivory">
+    <footer className="bg-dusk text-ivory">
       <Container className="py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_2fr]">
           <div className="max-w-sm">
