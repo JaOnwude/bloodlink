@@ -82,6 +82,37 @@ done, the pricing and priorities here are working assumptions, not findings.
 Requests past their deadline expire automatically, and every sensitive action is written to
 an append-only audit log.
 
+### Built on Nigeria's digital postcode
+
+BloodLink uses the NIPOST Postcode API wherever location matters. A postcode names one
+building in five segments (state, LGA, district, area, unit), for example `FC-01-A01-KP-27`.
+
+- **Registration.** Donors and hospitals add their postcode by typing it or with "Find from
+  my location" (NIPOST reverse search). Lookup level 1 (free) confirms NIPOST has assigned
+  it before it is saved; level 2 adds the state, LGA and locality names.
+- **Privacy.** A hospital keeps its full building postcode, because it is a public place. A
+  donor keeps only the area part (`FC-01-A01-KP`), so their home is never stored.
+- **Matching in postcode rings.** Donors in the hospital's own postcode area come first,
+  then the same district, LGA and state, then donors with no postcode; nearest first within
+  each ring. Alerts go out in this order.
+- **Alerts on any phone.** The donor's text message includes the hospital's postcode.
+- **Verifying hospitals.** The administrator's review shows NIPOST's record of the
+  building (lookup level 3: address and building use) next to what the hospital registered.
+- **Coverage.** Each hospital sees how many reachable donors of each blood group it has in
+  its postcode area, district, LGA and state (counts only), and where a drive would help.
+- **Families.** Anyone can open [`/find-blood`](https://bloodlink-olive.vercel.app/find-blood)
+  without an account, find a verified hospital by postcode or location, and ask it to find
+  donors. Nobody is alerted until the hospital confirms the patient on its ward and
+  approves; that raises an ordinary request. The family follows progress at a private
+  link and is texted when the hospital decides.
+
+Paid lookups (level 2 and up) are cached per building, so each is paid for once.
+`POSTCODE_MODE` chooses the source: `mock` (built-in sample buildings carrying NIPOST's
+published sandbox postcodes, labelled "Sample data" on screen), `test` (the NIPOST sandbox)
+or `live` (production data, which needs NIPOST business verification). Switching is a
+change of setting, not of code. The live demonstration runs on `mock` until production
+access is approved.
+
 ---
 
 ## The hard part
@@ -337,6 +368,21 @@ The backend has 338 tests. Those that need the database run against a separate
 PostgreSQL is not running they are skipped with a message, not failed. Every test is forced
 onto the console SMS sender, so no test can send a real message.
 
+### Postcodes
+
+`POSTCODE_MODE=mock` (the default) needs no key. To call NIPOST, create a key in the
+[NIPOST developer dashboard](https://dashboard.postcode.gov.ng), set `NIPOST_API_KEY`,
+`POSTCODE_MODE=test` (for a `nipost_test_` key) or `live`, and `NIPOST_MAX_LOOKUP_LEVEL` to the
+level granted to your organisation. A key from the wrong environment falls back to the mock
+with a warning.
+
+To bring a demonstration seeded before a feature existed up to date (sample postcodes, a
+fresh open request, and `DEMO_DONOR_PHONE` given to the first matching donor), run
+`uv run python -m scripts.refresh_demo`. It touches only demonstration accounts and can be
+run any number of times. `DEMO_PASSWORD` is only read when the demonstration accounts are
+created; after changing it, add `--reset-passwords` to move every demonstration account to
+the new value.
+
 ### Text messages
 
 By default (`SMS_PROVIDER=console`) alerts are recorded and written to the API log without
@@ -381,6 +427,9 @@ docs/              data model and deployment guide
   needs, shares contact details only after a pledge, and keeps phone numbers and tokens out
   of logs. A data protection impact assessment and advice from a qualified professional are
   needed before real use.
+- **Postcodes:** a donor's building postcode is checked with NIPOST and cut back to its area
+  before it is stored. Positions sent to find a postcode are used for that search only.
+  Families' names and phone numbers are seen only by the hospital they asked.
 - **Not medical screening:** final eligibility is always decided by clinical staff at the
   donation site.
 - **Security:** argon2 password hashing, a 15-character minimum password following NIST SP
@@ -389,7 +438,8 @@ docs/              data model and deployment guide
 
 ## What comes next
 
-Notification waves that widen the radius after a timeout; a donor reliability score; quiet
+Notification waves that widen ring by ring after a timeout; NIPOST bulk access to bring
+hospitals' paper donor registers online; a donor reliability score; quiet
 hours; WhatsApp and USSD alerts; partner blood bank stock checked before donors are asked;
 Paystack billing; and a multilingual offline app (English, Pidgin, Yoruba, Hausa, Igbo).
 The schema is designed so that none of these needs existing data to be rewritten.
